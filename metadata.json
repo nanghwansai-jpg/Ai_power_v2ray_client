@@ -1,0 +1,6 @@
+{
+  "name": "AI V2Ray Client",
+  "description": "AI-powered V2Ray configuration manager by Victor Geek",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

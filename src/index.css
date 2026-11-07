@@ -1,0 +1,281 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: 'Roboto Mono', monospace;
+  --font-sans: 'Inter', 'Noto Sans Myanmar', sans-serif;
+  --font-burmese: 'Noto Sans Myanmar', sans-serif;
+}
+
+/* =========================================================================
+   INDUSTRIAL PRECISION-INSTRUMENT DESIGN SYSTEM
+   - Steel Chassis: #2C3035 with horizontal grain & 6% noise
+   - Burnished Copper Wordmark: Front #C87547, Side #7A4A1F, Cap #E8C99A, Halo #E8B274 @ 35%
+   - Incised Gunmetal Text: 0 1px 0 rgba(154,161,168,0.55) + 0 -1px 0 rgba(6,7,10,0.85)
+   - Machined-Recess Trays: 9dp Chamfered Bevels
+   - Brushed-Steel Key-Caps with Warm Copper Under-Glow
+   - Industrial Toggle Switches with Metal Dome Indicators
+   - Precision Analog Dials with Copper Needles
+   - STRICT BAN: NO BLUE ANYWHERE
+   ========================================================================= */
+
+:root {
+  --bg-steel: #2C3035;
+  --copper-front: #C87547;
+  --copper-bevel: #7A4A1F;
+  --copper-cap: #E8C99A;
+  --amber-halo: rgba(232, 178, 116, 0.35);
+  --gunmetal-plate: #1F2226;
+  --milled-recess: #181A1D;
+  --milled-border: #3D434B;
+}
+
+html, body {
+  background-color: #2C3035;
+  color: #D1D5DB;
+  font-family: 'Inter', 'Noto Sans Myanmar', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* 1. BRUSHED STEEL BACKGROUND WITH HORIZONTAL GRAIN & 6% NOISE */
+.bg-brushed-steel {
+  background-color: #2C3035;
+  background-image:
+    /* Fine horizontal grain lines (machined pass) */
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.02) 0px,
+      rgba(255, 255, 255, 0.02) 1px,
+      transparent 1px,
+      transparent 2px
+    ),
+    /* Micro-pitch brushed striation */
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.035) 0px,
+      rgba(0, 0, 0, 0.035) 2px,
+      transparent 2px,
+      transparent 5px
+    ),
+    /* 6% noise emulation matrix */
+    radial-gradient(
+      ellipse at 50% 0%,
+      rgba(232, 201, 154, 0.05) 0%,
+      rgba(44, 48, 53, 0.8) 50%,
+      rgba(20, 22, 25, 0.95) 100%
+    );
+  background-attachment: fixed;
+}
+
+/* 2. 3D-EXTRUDED BURNISHED COPPER WORDMARK */
+.wordmark-copper-3d {
+  color: #C87547;
+  text-shadow:
+    0 -1px 0 #E8C99A,                  /* highlight cap */
+    0 1px 0 #7A4A1F,                   /* side-bevel layer 1 */
+    0 2px 0 #7A4A1F,                   /* side-bevel layer 2 */
+    0 3px 0 #5E3714,                   /* deeper extrusion */
+    0 4px 1px rgba(10, 11, 13, 0.85),  /* contact drop shadow */
+    0 0 16px rgba(232, 178, 116, 0.35); /* soft amber halo @ 35% */
+  font-family: 'Inter', sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+/* 3. INCISED TEXT ON BRUSHED GUNMETAL (Factory Serial Plate Effect) */
+.text-incised {
+  color: rgba(168, 174, 180, 0.85);
+  text-shadow:
+    0 1px 0 rgba(154, 161, 168, 0.55),
+    0 -1px 0 rgba(6, 7, 10, 0.85);
+}
+
+.text-incised-strong {
+  color: #c4cad0;
+  text-shadow:
+    0 1px 0 rgba(154, 161, 168, 0.65),
+    0 -1px 0 rgba(6, 7, 10, 0.95);
+}
+
+.text-incised-copper {
+  color: #C87547;
+  text-shadow:
+    0 1px 0 rgba(232, 201, 154, 0.45),
+    0 -1px 0 rgba(6, 7, 10, 0.9);
+}
+
+.text-incised-amber {
+  color: #E8B274;
+  text-shadow:
+    0 1px 0 rgba(232, 201, 154, 0.4),
+    0 -1px 0 rgba(6, 7, 10, 0.85);
+}
+
+/* 4. MACHINED-RECESS TRAYS WITH 9dp (~9px) CHAMFERED BEVELS */
+.chamfer-tray-9dp {
+  background: linear-gradient(180deg, #1d2024 0%, #16181b 100%);
+  clip-path: polygon(
+    9px 0%,
+    calc(100% - 9px) 0%,
+    100% 9px,
+    100% calc(100% - 9px),
+    calc(100% - 9px) 100%,
+    9px 100%,
+    0% calc(100% - 9px),
+    0% 9px
+  );
+  box-shadow:
+    inset 1px 1px 0 rgba(154, 161, 168, 0.15),
+    inset -1px -1px 0 rgba(6, 7, 10, 0.85),
+    inset 0 3px 6px rgba(0, 0, 0, 0.6),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+  border: 1px solid #383e47;
+  position: relative;
+}
+
+/* Outer chamfered bezel container */
+.chamfer-bezel-outer {
+  background: linear-gradient(135deg, #444b54 0%, #26292e 50%, #1c1e22 100%);
+  padding: 1.5px;
+  clip-path: polygon(
+    10px 0%,
+    calc(100% - 10px) 0%,
+    100% 10px,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    10px 100%,
+    0% calc(100% - 10px),
+    0% 10px
+  );
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* 5. BRUSHED-STEEL KEY-CAPS */
+.keycap-steel {
+  background: linear-gradient(180deg, #3d434c 0%, #292d33 60%, #1f2227 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 2px solid #101215;
+  border-left: 1px solid #343941;
+  border-right: 1px solid #343941;
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: all 0.15s ease-out;
+}
+
+.keycap-steel:hover {
+  background: linear-gradient(180deg, #464d57 0%, #30353d 60%, #24282e 100%);
+}
+
+.keycap-steel:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.7),
+    inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* Active Warm Copper Under-Glow */
+.keycap-copper-active {
+  background: linear-gradient(180deg, #3d322c 0%, #29211c 60%, #1d1713 100%) !important;
+  border-top: 1px solid #E8C99A !important;
+  border-bottom: 2px solid #5E3714 !important;
+  box-shadow:
+    0 0 24px rgba(200, 117, 71, 0.5),
+    0 0 8px rgba(232, 178, 116, 0.4),
+    0 4px 10px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 #E8C99A !important;
+}
+
+/* 6. METAL DOME INDICATOR (Industrial Toggle Switch) */
+.metal-dome {
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 35%, #e8ebee 0%, #8b939e 50%, #3a3f47 100%);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.6),
+    inset 0 1px 1px rgba(255, 255, 255, 0.6);
+}
+
+.metal-dome-active {
+  background: radial-gradient(circle at 35% 35%, #fff2e0 0%, #E8B274 40%, #C87547 75%, #7A4A1F 100%) !important;
+  box-shadow:
+    0 0 8px #C87547,
+    0 0 14px rgba(232, 178, 116, 0.6),
+    inset 0 1px 1px #fff2e0 !important;
+}
+
+/* 7. PASSING COPPER/AMBER HEARTBEAT OSCILLOSCOPE ANIMATION */
+@keyframes heartbeat-copper-sweep {
+  0% {
+    stroke-dashoffset: 750;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: -750;
+    opacity: 0;
+  }
+}
+
+.animate-copper-pulse {
+  animation: heartbeat-copper-sweep 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Factory Plate Rivet */
+.plate-rivet {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 35%, #9ea5ad 0%, #464c54 60%, #1f2226 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.3),
+    0 1px 1px rgba(0, 0, 0, 0.8);
+}
+
+/* Industrial Hex Screws */
+.hex-screw {
+  width: 6px;
+  height: 6px;
+  background: #3c424a;
+  border-radius: 1px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 1px rgba(0, 0, 0, 0.7);
+  position: relative;
+}
+.hex-screw::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: #17191c;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/* Custom Industrial Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1f2226;
+  border-left: 1px solid #2d3238;
+}
+::-webkit-scrollbar-thumb {
+  background: #3d434c;
+  border-radius: 2px;
+  border: 1px solid #4f5661;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C87547;
+}

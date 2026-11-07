@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan to build an AI-powered Web Dashboard for managing V2Ray configurations. Since a native Android app cannot be built, this PWA will act as a research and validation engine, generating importable configs for any V2Ray client.",
+  "updatedAt":  "2026-10-11T09:32:46.342625461Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
