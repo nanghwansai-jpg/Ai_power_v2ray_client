@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { TargetPlatform, Language } from '../types';
-import { translations, targetDetails } from '../translations';
-import { Target, ChevronDown, Check, Sparkles } from 'lucide-react';
+import { targetDetails } from '../translations';
+import { Bot, Sparkles } from 'lucide-react';
 
 interface TargetPlatformSelectorProps {
   lang: Language;
@@ -16,146 +16,84 @@ export const TargetPlatformSelector: React.FC<TargetPlatformSelectorProps> = ({
   onSelectTarget,
   isOptimizing,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const t = translations[lang];
-
   const platforms: TargetPlatform[] = [
-    'general',
-    'facebook',
-    'telegram',
     'pubg',
     'mlbb',
-    'hok',
+    'facebook',
+    'telegram',
     'youtube',
     'tiktok',
+    'hok',
+    'general',
   ];
 
-  const currentInfo = targetDetails[selectedTarget];
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleSelect = (platform: TargetPlatform) => {
-    onSelectTarget(platform);
-    setIsOpen(false);
-  };
-
   return (
-    <div className="relative mb-3.5 z-30" ref={dropdownRef}>
-      {/* Compact Dropdown Trigger Button */}
-      <div className="bg-[#1e2227] border border-[#2e343b] hover:border-[#3b434d] rounded-2xl p-2.5 sm:p-3 shadow-md transition-all">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          {/* Label & Description */}
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-xl bg-[#C87547]/15 border border-[#C87547]/40 flex items-center justify-center text-[#C87547] shrink-0">
-              <Target className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold font-mono text-white truncate">
-                  {lang === 'EN' ? 'Target App & Routing Mode:' : 'အသုံးပြုမည့် App / Game ရွေးချယ်မှု:'}
-                </span>
-                {isOptimizing && (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-[#f59e0b] font-mono animate-pulse font-bold">
-                    <Sparkles className="w-2.5 h-2.5" />
-                    <span>AI Calibrating...</span>
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] text-neutral-400 font-mono truncate hidden sm:block">
-                {lang === 'EN'
-                  ? 'AI auto-routes CDN clusters with latency < 100ms'
-                  : 'CDN cluster များသို့ စမ်းသပ်ကာ ping အနည်းဆုံး စီစဉ်ပေးပါသည်'}
-              </p>
-            </div>
+    <div className="mb-4 bg-[#1F2226] border border-[#3D434B] rounded-2xl p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.5)]">
+      {/* AI Prompt Header */}
+      <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#2C3035]">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-xl bg-[#C87547]/20 border border-[#C87547] flex items-center justify-center text-[#E8C99A] shadow-[0_0_10px_rgba(200,117,71,0.3)]">
+            <Bot size={18} />
           </div>
-
-          {/* Interactive Dropdown Box */}
-          <button
-            type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            disabled={isOptimizing}
-            className={`flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl border text-left transition-all w-full sm:w-auto min-w-[210px] sm:min-w-[240px] ${
-              isOpen
-                ? 'bg-[#252a30] border-[#C87547] text-white ring-1 ring-[#C87547]/30'
-                : 'bg-[#252a30] border-[#2e343b] hover:border-[#3b434d] text-neutral-200'
-            } disabled:opacity-50 active:scale-98`}
-          >
-            <div className="flex items-center gap-2 truncate">
-              <span className="text-base shrink-0">{currentInfo.icon}</span>
-              <div className="truncate">
-                <span className="text-xs font-bold font-mono text-white block leading-tight truncate">
-                  {lang === 'EN' ? currentInfo.labelEn : currentInfo.labelMm}
-                </span>
-                <span className="text-[9px] text-[#f59e0b] font-mono block leading-tight truncate">
-                  {currentInfo.cdn}
-                </span>
-              </div>
-            </div>
-
-            <ChevronDown
-              className={`w-4 h-4 text-[#C87547] shrink-0 transition-transform duration-200 ${
-                isOpen ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
+          <div>
+            <h3 className="text-xs sm:text-sm font-bold text-[#E8C99A] tracking-wide">
+              {lang === 'EN'
+                ? 'AI Assistant: "What will you use this VPN for?"'
+                : 'AI စနစ်: "VPN ကို ဘာအတွက် အဓိက အသုံးပြုမည်နည်း?"'}
+            </h3>
+            <p className="text-[10px] text-[#A6ADB8] font-mono">
+              {lang === 'EN'
+                ? 'Select a target choice below — AI will search, calibrate, and build the best sub-100ms tunnel'
+                : 'အောက်ပါ ခလုတ်များထဲမှ ရွေးချယ်ပါ — AI မှ အထူးသင့်လျော်သော Ping အနည်းဆုံး Server ကို တည်ဆောက်ပေးပါမည်'}
+            </p>
+          </div>
         </div>
+
+        {isOptimizing && (
+          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#7A4A1F]/40 border border-[#E8C99A] text-[10px] text-[#E8C99A] font-mono animate-pulse">
+            <Sparkles size={12} className="text-[#E8B274]" />
+            <span>AI Building...</span>
+          </span>
+        )}
       </div>
 
-      {/* Dropdown Options Menu Overlay */}
-      {isOpen && (
-        <div className="absolute top-full left-0 right-0 sm:right-0 sm:left-auto sm:w-[320px] mt-1.5 p-1.5 bg-[#16181b] border border-[#2e343b] rounded-2xl shadow-2xl backdrop-blur-xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 max-h-72 overflow-y-auto">
-          <div className="px-2.5 py-1 text-[10px] font-mono font-semibold text-neutral-400 uppercase tracking-wider border-b border-[#2e343b] mb-1">
-            {lang === 'EN' ? 'Select Platform for Low-Ping Routing' : 'အကောင်းဆုံး Routing အတွက် ရွေးချယ်ပါ'}
-          </div>
+      {/* Choice Buttons Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        {platforms.map((key) => {
+          const info = targetDetails[key];
+          const isSelected = selectedTarget === key;
 
-          <div className="space-y-1">
-            {platforms.map((key) => {
-              const info = targetDetails[key];
-              const isSelected = selectedTarget === key;
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleSelect(key)}
-                  className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-left transition-all ${
-                    isSelected
-                      ? 'bg-[#252a30] text-[#C87547] font-bold border border-[#C87547]/40 shadow-sm'
-                      : 'text-neutral-300 hover:bg-[#252a30]/60 hover:text-white border border-transparent'
+          return (
+            <button
+              key={key}
+              type="button"
+              disabled={isOptimizing}
+              onClick={() => onSelectTarget(key)}
+              className={`group relative flex items-center space-x-2.5 px-3 py-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                isSelected
+                  ? 'bg-gradient-to-r from-[#7A4A1F] to-[#4A2C13] border-[#E8C99A] shadow-[0_0_14px_rgba(232,178,116,0.35)] scale-[1.02]'
+                  : 'bg-[#16181B] border-[#3D434B] hover:border-[#C87547] hover:bg-[#202429]'
+              }`}
+            >
+              <span className="text-xl shrink-0 group-hover:scale-110 transition-transform">
+                {info.icon}
+              </span>
+              <div className="min-w-0">
+                <span
+                  className={`text-xs font-bold block truncate tracking-wide ${
+                    isSelected ? 'text-[#E8C99A]' : 'text-[#E6EAF0]'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <span className="text-base shrink-0">{info.icon}</span>
-                    <div className="truncate">
-                      <span className="text-xs font-mono font-bold block leading-tight truncate">
-                        {lang === 'EN' ? info.labelEn : info.labelMm}
-                      </span>
-                      <span className="text-[9px] text-neutral-400 font-mono block leading-tight truncate">
-                        {info.cdn}
-                      </span>
-                    </div>
-                  </div>
-
-                  {isSelected && (
-                    <span className="w-4 h-4 rounded-full bg-[#C87547]/20 border border-[#C87547] flex items-center justify-center text-[#C87547] shrink-0">
-                      <Check className="w-2.5 h-2.5" />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                  {info.labelEn}
+                </span>
+                <span className="text-[9px] font-mono block truncate text-[#A6ADB8]">
+                  {key === 'pubg' || key === 'mlbb' ? 'Gaming < 35ms' : info.cdn.split(' ')[0]}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };
