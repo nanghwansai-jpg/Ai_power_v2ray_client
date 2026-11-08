@@ -110,7 +110,7 @@ Respond ONLY in JSON matching this format:
 }`;
 
         const response = await this.geminiAi.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           contents: prompt,
           config: {
             temperature: 0.2,
