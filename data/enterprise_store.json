@@ -1,0 +1,139 @@
+{
+  "nodes": [
+    {
+      "id": "node-sg-01",
+      "name": "🇸🇬 SG-Cloudflare-Reality-01 [Ultra Low Latency]",
+      "protocol": "vless",
+      "host": "sg-edge01.cloudflare-sea.net",
+      "port": 443,
+      "region": "Singapore",
+      "countryCode": "SG",
+      "flag": "🇸🇬",
+      "ping": 28,
+      "lossRate": 0,
+      "speedDown": "128 Mbps",
+      "speedUp": "45 Mbps",
+      "rawKey": "vless://4a83e091-6677-4482-9e12-8812c3f9104b@sg-edge01.cloudflare-sea.net:443?encryption=none&security=reality&sni=sg.gateway.cloudflare.com&fp=chrome&pbk=J8Y_19mZKL7-2A9B&type=tcp#SG-CF-Fast-01",
+      "security": "reality",
+      "network": "tcp",
+      "sni": "sg.gateway.cloudflare.com",
+      "targetOptimized": [
+        "general",
+        "pubg",
+        "mlbb",
+        "facebook",
+        "telegram"
+      ],
+      "isRecommended": true,
+      "score": 99
+    },
+    {
+      "id": "node-sg-02",
+      "name": "🇸🇬 SG-AWS-Gaming-LowPing [MLBB / PUBG Direct]",
+      "protocol": "trojan",
+      "host": "18.141.22.84",
+      "port": 443,
+      "region": "Singapore",
+      "countryCode": "SG",
+      "flag": "🇸🇬",
+      "ping": 34,
+      "lossRate": 0,
+      "speedDown": "150 Mbps",
+      "speedUp": "60 Mbps",
+      "rawKey": "trojan://victor_geek_vip_sg2@18.141.22.84:443?security=tls&sni=game-sg.moonton.com&type=ws&path=%2Fgaming-ws#SG-AWS-Gaming-02",
+      "security": "tls",
+      "network": "ws",
+      "sni": "game-sg.moonton.com",
+      "targetOptimized": [
+        "pubg",
+        "mlbb",
+        "hok"
+      ],
+      "isRecommended": true,
+      "score": 97
+    },
+    {
+      "id": "node-hk-01",
+      "name": "🇭🇰 HK-Alibaba-FastRoute [Meta & Telegram DC5]",
+      "protocol": "vless",
+      "host": "47.242.88.19",
+      "port": 443,
+      "region": "Hong Kong",
+      "countryCode": "HK",
+      "flag": "🇭🇰",
+      "ping": 42,
+      "lossRate": 0,
+      "speedDown": "110 Mbps",
+      "speedUp": "40 Mbps",
+      "rawKey": "vless://981e411b-7a2e-4b7b-8b5e-450f3c026922@47.242.88.19:443?encryption=none&security=reality&sni=hk-cdn.alibaba.com&fp=chrome&pbk=G8X_82nZKL7-9B1A&type=tcp#HK-Ali-01",
+      "security": "reality",
+      "network": "tcp",
+      "sni": "hk-cdn.alibaba.com",
+      "targetOptimized": [
+        "facebook",
+        "telegram",
+        "browsing"
+      ],
+      "isRecommended": true,
+      "score": 94
+    },
+    {
+      "id": "node-th-01",
+      "name": "🇹🇭 TH-BKK-TrueIDC [Southeast Asia Gateway]",
+      "protocol": "trojan",
+      "host": "203.144.144.20",
+      "port": 443,
+      "region": "Thailand",
+      "countryCode": "TH",
+      "flag": "🇹🇭",
+      "ping": 38,
+      "lossRate": 0,
+      "speedDown": "95 Mbps",
+      "speedUp": "35 Mbps",
+      "rawKey": "trojan://victor_bkk_direct@203.144.144.20:443?security=tls&sni=bkk.truecorp.th&type=tcp#TH-BKK-01",
+      "security": "tls",
+      "network": "tcp",
+      "sni": "bkk.truecorp.th",
+      "targetOptimized": [
+        "general",
+        "streaming"
+      ],
+      "isRecommended": true,
+      "score": 92
+    },
+    {
+      "id": "node-jp-01",
+      "name": "🇯🇵 JP-Tokyo-Linode [Media Streaming & YouTube 4K]",
+      "protocol": "vmess",
+      "host": "172.105.210.15",
+      "port": 443,
+      "region": "Japan",
+      "countryCode": "JP",
+      "flag": "🇯🇵",
+      "ping": 58,
+      "lossRate": 0,
+      "speedDown": "160 Mbps",
+      "speedUp": "55 Mbps",
+      "rawKey": "vmess://eyJhZGQiOiIxNzIuMTA1LjIxMC4xNSIsImFpZCI6IjAiLCJob3N0IjoidG9reW8ubGlub2RlLmNvbSIsImlkIjoiZjI2ZWI4YTYtYzQ5ZC00ZjJhLTlhM2YtNGQzYTU4OTdhNWQxIiwibmV0Ijoid3MiLCJwYXRoIjoiL3ZtZXNzLXdzIiwicG9ydCI6IjQ0MyIsInBzIjoiSlAtVG9reW8tMDFzIiwidGxzIjoidGxzIiwidHlwZSI6Im5vbmUiLCJ2IjoiMiJ9",
+      "security": "tls",
+      "network": "ws",
+      "sni": "tokyo.linode.com",
+      "targetOptimized": [
+        "youtube",
+        "streaming",
+        "tiktok"
+      ],
+      "isRecommended": false,
+      "score": 88
+    }
+  ],
+  "selectedNodeId": null,
+  "autoFailoverEnabled": true,
+  "historyLogs": [
+    {
+      "timestamp": 1794136755799,
+      "event": "SYSTEM_INIT",
+      "details": "Enterprise Storage & Memory Cache initialized successfully"
+    }
+  ]
+}

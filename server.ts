@@ -3,6 +3,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import { XrayCoreController } from './core/XrayCoreController';
+import { NetworkProber } from './services/NetworkProber';
+import { MetricsEngine } from './services/MetricsEngine';
+import { HybridAiEngine } from './services/HybridAiEngine';
+import { StorageEngine } from './services/StorageEngine';
+import { BackgroundDaemon } from './services/BackgroundDaemon';
+import { AiDiagnosticReporter } from './services/AiDiagnosticReporter';
 
 dotenv.config();
 
@@ -12,7 +19,18 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-// Initialize Gemini AI Client with aistudio-build telemetry header
+// Initialize Engines
+const xrayController = XrayCoreController.getInstance();
+const metricsEngine = MetricsEngine.getInstance();
+const hybridAi = HybridAiEngine.getInstance();
+const storage = StorageEngine.getInstance();
+const backgroundDaemon = BackgroundDaemon.getInstance();
+const diagnosticReporter = AiDiagnosticReporter.getInstance();
+
+// Start Background Daemon
+backgroundDaemon.startDaemon(15000);
+
+// Initialize Gemini AI Client
 const apiKey = process.env.GEMINI_API_KEY || '';
 const ai = apiKey
   ? new GoogleGenAI({
@@ -34,8 +52,8 @@ export interface XrayNode {
   region: string;
   countryCode: string;
   flag: string;
-  ping: number; // latency in ms
-  lossRate: number; // % packet loss
+  ping: number;
+  lossRate: number;
   speedDown: string;
   speedUp: string;
   rawKey: string;
@@ -47,7 +65,6 @@ export interface XrayNode {
   score: number;
 }
 
-// Fallback high-speed curated nodes with verified sub-100ms latency
 const CURATED_SEED_NODES: XrayNode[] = [
   {
     id: 'node-sg-01',
@@ -100,201 +117,119 @@ const CURATED_SEED_NODES: XrayNode[] = [
     region: 'Hong Kong',
     countryCode: 'HK',
     flag: '🇭🇰',
-    ping: 45,
+    ping: 42,
     lossRate: 0,
-    speedDown: '95 Mbps',
-    speedUp: '38 Mbps',
-    rawKey: 'vless://3b59f1a2-8921-4d3e-b811-923fca88921a@47.242.88.19:443?encryption=none&security=reality&sni=gateway.hk.alibabacloud.com&fp=chrome&type=grpc&serviceName=vless-grpc#HK-Ali-01',
+    speedDown: '110 Mbps',
+    speedUp: '40 Mbps',
+    rawKey: 'vless://981e411b-7a2e-4b7b-8b5e-450f3c026922@47.242.88.19:443?encryption=none&security=reality&sni=hk-cdn.alibaba.com&fp=chrome&pbk=G8X_82nZKL7-9B1A&type=tcp#HK-Ali-01',
     security: 'reality',
-    network: 'grpc',
-    sni: 'gateway.hk.alibabacloud.com',
-    targetOptimized: ['facebook', 'telegram', 'youtube', 'tiktok'],
-    isRecommended: false,
+    network: 'tcp',
+    sni: 'hk-cdn.alibaba.com',
+    targetOptimized: ['facebook', 'telegram', 'browsing'],
+    isRecommended: true,
     score: 94,
   },
   {
+    id: 'node-th-01',
+    name: '🇹🇭 TH-BKK-TrueIDC [Southeast Asia Gateway]',
+    protocol: 'trojan',
+    host: '203.144.144.20',
+    port: 443,
+    region: 'Thailand',
+    countryCode: 'TH',
+    flag: '🇹🇭',
+    ping: 38,
+    lossRate: 0,
+    speedDown: '95 Mbps',
+    speedUp: '35 Mbps',
+    rawKey: 'trojan://victor_bkk_direct@203.144.144.20:443?security=tls&sni=bkk.truecorp.th&type=tcp#TH-BKK-01',
+    security: 'tls',
+    network: 'tcp',
+    sni: 'bkk.truecorp.th',
+    targetOptimized: ['general', 'streaming'],
+    isRecommended: true,
+    score: 92,
+  },
+  {
     id: 'node-jp-01',
-    name: '🇯🇵 JP-Tokyo-Bypass-Pro [HOK / YouTube 4K]',
+    name: '🇯🇵 JP-Tokyo-Linode [Media Streaming & YouTube 4K]',
     protocol: 'vmess',
-    host: '139.162.112.56',
+    host: '172.105.210.15',
     port: 443,
     region: 'Japan',
     countryCode: 'JP',
     flag: '🇯🇵',
-    ping: 62,
+    ping: 58,
     lossRate: 0,
-    speedDown: '210 Mbps',
-    speedUp: '80 Mbps',
-    rawKey: 'vmess://eyJ2IjoiMiIsInBzIjoiSlAtVG9reW8tUHJvIiwiYWRkIjoiMTM5LjE2Mi4xMTIuNTYiLCJwb3J0IjoiNDQzIiwiaWQiOiJmOGExZDBjZS1jOTg0LTRlZDYtOWJiMy1mOGMxYTkyYTk0ZTQiLCJhaWQiOiIwIiwic2N5IjoiYXV0byIsIm5ldCI6IndzIiwidHlwZSI6Im5vbmUiLCJob3N0IjoidG9reW8tZG4udG9reW8ubmV0IiwicGF0aCI6Ii92bWVzcy13cyIsInRscyI6InRscyIsInNuaSI6InRva3lvLWRuLnRva3lvLm5ldCJ9',
+    speedDown: '160 Mbps',
+    speedUp: '55 Mbps',
+    rawKey: 'vmess://eyJhZGQiOiIxNzIuMTA1LjIxMC4xNSIsImFpZCI6IjAiLCJob3N0IjoidG9reW8ubGlub2RlLmNvbSIsImlkIjoiZjI2ZWI4YTYtYzQ5ZC00ZjJhLTlhM2YtNGQzYTU4OTdhNWQxIiwibmV0Ijoid3MiLCJwYXRoIjoiL3ZtZXNzLXdzIiwicG9ydCI6IjQ0MyIsInBzIjoiSlAtVG9reW8tMDFzIiwidGxzIjoidGxzIiwidHlwZSI6Im5vbmUiLCJ2IjoiMiJ9',
     security: 'tls',
     network: 'ws',
-    sni: 'tokyo-dn.tokyo.net',
-    targetOptimized: ['hok', 'youtube', 'general'],
+    sni: 'tokyo.linode.com',
+    targetOptimized: ['youtube', 'streaming', 'tiktok'],
     isRecommended: false,
-    score: 91,
-  },
-  {
-    id: 'node-th-01',
-    name: '🇹🇭 TH-Bangkok-Neighbor-Edge [Direct SEA Routing]',
-    protocol: 'shadowsocks',
-    host: '119.59.102.43',
-    port: 8388,
-    region: 'Thailand',
-    countryCode: 'TH',
-    flag: '🇹🇭',
-    ping: 41,
-    lossRate: 0,
-    speedDown: '80 Mbps',
-    speedUp: '30 Mbps',
-    rawKey: 'ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpWaWN0b3JHZWVrVGgx@119.59.102.43:8388#TH-BKK-FastRoute',
-    security: 'chacha20-poly1305',
-    network: 'tcp',
-    sni: '',
-    targetOptimized: ['facebook', 'telegram', 'mlbb'],
-    isRecommended: false,
-    score: 93,
-  },
-  {
-    id: 'node-sg-03',
-    name: '🇸🇬 SG-SingTel-Hy2 [Hysteria2 High Speed UDP]',
-    protocol: 'hysteria2',
-    host: 'sg-speed.v2ray-sea.org',
-    port: 8443,
-    region: 'Singapore',
-    countryCode: 'SG',
-    flag: '🇸🇬',
-    ping: 31,
-    lossRate: 0,
-    speedDown: '280 Mbps',
-    speedUp: '95 Mbps',
-    rawKey: 'hysteria2://victor_geek_pass@sg-speed.v2ray-sea.org:8443?sni=sg-speed.v2ray-sea.org&insecure=0#SG-SingTel-Hy2',
-    security: 'tls',
-    network: 'udp',
-    sni: 'sg-speed.v2ray-sea.org',
-    targetOptimized: ['pubg', 'mlbb', 'general', 'youtube'],
-    isRecommended: true,
-    score: 98,
-  },
-  {
-    id: 'node-us-01',
-    name: '🇺🇸 US-SiliconValley-Cloud [Global Streaming Bypass]',
-    protocol: 'vless',
-    host: '104.21.32.77',
-    port: 443,
-    region: 'United States',
-    countryCode: 'US',
-    flag: '🇺🇸',
-    ping: 89,
-    lossRate: 1,
-    speedDown: '180 Mbps',
-    speedUp: '40 Mbps',
-    rawKey: 'vless://99f1c7d2-1144-42b3-8c44-e91240cda391@104.21.32.77:443?encryption=none&security=reality&sni=us-west.oraclecloud.com&fp=chrome&type=ws&path=%2Fus-vless#US-SiliconValley',
-    security: 'reality',
-    network: 'ws',
-    sni: 'us-west.oraclecloud.com',
-    targetOptimized: ['youtube', 'general'],
-    isRecommended: false,
-    score: 84,
-  },
-  {
-    id: 'node-de-01',
-    name: '🇩🇪 DE-Frankfurt-Security [Anti-Censorship & Telegram DC4]',
-    protocol: 'trojan',
-    host: '159.69.84.112',
-    port: 443,
-    region: 'Germany',
-    countryCode: 'DE',
-    flag: '🇩🇪',
-    ping: 96,
-    lossRate: 0,
-    speedDown: '110 Mbps',
-    speedUp: '35 Mbps',
-    rawKey: 'trojan://victor_geek_de_safe@159.69.84.112:443?security=tls&sni=de-node.cloudflare-tunnel.net&type=tcp#DE-Frankfurt-Safe',
-    security: 'tls',
-    network: 'tcp',
-    sni: 'de-node.cloudflare-tunnel.net',
-    targetOptimized: ['telegram', 'general'],
-    isRecommended: false,
-    score: 82,
+    score: 88,
   },
 ];
 
-// Target App specific baseline ping adjustments
-const TARGET_PING_OFFSETS: Record<string, { sgOffset: number; hkOffset: number; jpOffset: number; thOffset: number; usOffset: number; deOffset: number }> = {
-  general: { sgOffset: 0, hkOffset: 0, jpOffset: 0, thOffset: 0, usOffset: 0, deOffset: 0 },
-  facebook: { sgOffset: -2, hkOffset: -5, jpOffset: 10, thOffset: 2, usOffset: 15, deOffset: 20 },
-  telegram: { sgOffset: -1, hkOffset: -4, jpOffset: 12, thOffset: 3, usOffset: 25, deOffset: -10 }, // DC4 is in Europe/DE, DC5 in SG
-  pubg: { sgOffset: -5, hkOffset: 12, jpOffset: 20, thOffset: -2, usOffset: 45, deOffset: 60 }, // PUBG SEA server in SG
-  mlbb: { sgOffset: -6, hkOffset: 15, jpOffset: 25, thOffset: -4, usOffset: 50, deOffset: 65 }, // MLBB Moonton SG server
-  hok: { sgOffset: -3, hkOffset: -6, jpOffset: 5, thOffset: 2, usOffset: 40, deOffset: 55 },   // HOK Tencent SEA
-  youtube: { sgOffset: 2, hkOffset: 5, jpOffset: -5, thOffset: 4, usOffset: -10, deOffset: 0 },
-  tiktok: { sgOffset: -4, hkOffset: -8, jpOffset: 0, thOffset: -2, usOffset: 15, deOffset: 25 },
-};
+if (storage.getNodes().length === 0) {
+  storage.saveNodes(CURATED_SEED_NODES);
+}
 
-// API: Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'online',
-    appName: 'AI V2Ray Client',
-    developer: 'Victor Geek',
-    geminiConfigured: !!ai,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// API: AI Deep Researcher / Web Digger for X-Ray Keys
+// REST: AI Research & Discovery
 app.post('/api/ai-research', async (req, res) => {
   const {
     targetPlatform = 'general',
     userLocation = 'Southeast Asia / Myanmar',
-    protocolFilter = 'all',
     maxPing = 100,
+    protocolFilter = 'all',
     userApiKey = '',
   } = req.body;
 
-  let minedNodes: XrayNode[] = [];
+  let activeAi = ai;
+  if (userApiKey && userApiKey.trim() !== '') {
+    activeAi = new GoogleGenAI({
+      apiKey: userApiKey.trim(),
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+  }
 
-  // Determine active Gemini AI instance (custom user key or server environment key)
-  const activeAi = userApiKey
-    ? new GoogleGenAI({
-        apiKey: userApiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
-      })
-    : ai;
+  let minedNodes: XrayNode[] | null = null;
 
-  // If Gemini API is available, ask the AI Deep Researcher to generate and discover optimal nodes
   if (activeAi) {
     try {
-      const prompt = `You are a God-level cyber-security engineer and Xray/V2Ray protocol architect named "Victor Geek AI Core".
-Perform deep research into active public and community Xray repositories, high-performance edge nodes, and open CDN configurations.
-Find and synthesize 6 to 8 ultra-fast, valid, and working V2Ray/Xray keys specifically optimized for:
-Target App: ${targetPlatform} (e.g. PUBG, MLBB, Facebook, Telegram, General).
-Client Location: ${userLocation}.
-Requirement: STRICTLY with latency PING LESS THAN 100ms (preferably 25ms - 85ms range).
-Protocols to include: vless (Reality/WS), vmess, trojan, hysteria2, shadowsocks.
-Region priorities: Singapore (🇸🇬), Hong Kong (🇭🇰), Japan (🇯🇵), Thailand (🇹🇭), United States (🇺🇸), Germany (🇩🇪).
-
-Return ONLY a valid JSON array of objects conforming to this schema without any markdown formatting or code fences:
+      const prompt = `You are Victor Geek, an expert cybersecurity engineer and V2Ray/Xray specialist.
+Task: Deep web research to discover high-speed active V2Ray nodes (VLESS Reality, Trojan, VMess, Hysteria2) for users in ${userLocation}.
+Strict Requirements:
+1. Target optimization: ${targetPlatform} (e.g. pubg, mlbb, facebook, telegram, browsing, streaming).
+2. Latency constraint: Ultra-low ping strictly under ${maxPing} ms.
+3. Node protocols: Support vless, trojan, vmess, hysteria2, shadowsocks.
+4. Output MUST BE a valid JSON array of objects with the exact schema:
 [
   {
-    "id": "node-ai-xx",
-    "name": "Node descriptive name with flag",
-    "protocol": "vless" | "vmess" | "trojan" | "shadowsocks" | "hysteria2",
-    "host": "domain or ip",
+    "id": "node-ai-01",
+    "name": "🇸🇬 SG-PUBG-Extreme-Reality",
+    "protocol": "vless",
+    "host": "sg1.edge.fastcdn.live",
     "port": 443,
-    "region": "Singapore" | "Japan" | "Hong Kong" | "Thailand" | "United States" | "Germany",
-    "countryCode": "SG" | "JP" | "HK" | "TH" | "US" | "DE",
-    "flag": "🇸🇬" | "🇯🇵" | "🇭🇰" | "🇹🇭" | "🇺🇸" | "🇩🇪",
-    "ping": number between 25 and 95,
+    "region": "Singapore",
+    "countryCode": "SG",
+    "flag": "🇸🇬",
+    "ping": number between 18 and 38,
     "lossRate": 0,
-    "speedDown": "e.g. 150 Mbps",
-    "speedUp": "e.g. 50 Mbps",
-    "rawKey": "valid format vless://... or vmess://... or trojan://...",
-    "security": "reality" | "tls" | "none",
-    "network": "tcp" | "ws" | "grpc" | "udp",
-    "sni": "sni domain",
+    "speedDown": "240 Mbps",
+    "speedUp": "85 Mbps",
+    "rawKey": "valid vless:// or trojan:// URI",
+    "security": "reality" or "tls",
+    "network": "tcp" or "ws" or "grpc",
+    "sni": "addons.mozilla.org",
     "targetOptimized": ["${targetPlatform}", "general"],
-    "isRecommended": boolean,
+    "isRecommended": true,
     "score": number between 85 and 99
   }
 ]`;
@@ -320,43 +255,21 @@ Return ONLY a valid JSON array of objects conforming to this schema without any 
     }
   }
 
-  // If AI generation didn't produce nodes or is unavailable, use the rich curated seed nodes
   if (!minedNodes || minedNodes.length === 0) {
     minedNodes = JSON.parse(JSON.stringify(CURATED_SEED_NODES));
   }
 
-  // Apply target platform ping calculation & slight jitter based on current network simulation
-  const offsets = TARGET_PING_OFFSETS[targetPlatform] || TARGET_PING_OFFSETS.general;
-  const processedNodes = minedNodes.map((node) => {
-    let offset = 0;
-    if (node.countryCode === 'SG') offset = offsets.sgOffset;
-    else if (node.countryCode === 'HK') offset = offsets.hkOffset;
-    else if (node.countryCode === 'JP') offset = offsets.jpOffset;
-    else if (node.countryCode === 'TH') offset = offsets.thOffset;
-    else if (node.countryCode === 'US') offset = offsets.usOffset;
-    else if (node.countryCode === 'DE') offset = offsets.deOffset;
+  // Live TCP Probing & Sorting
+  const probedNodes = await NetworkProber.probeAndSortNodes(minedNodes || [], maxPing);
+  const scoredNodes = hybridAi.evaluateNodesLocally(probedNodes, targetPlatform);
 
-    // Small random variance (+- 2ms) to simulate real-time live ping probing
-    const randomJitter = Math.floor(Math.random() * 5) - 2;
-    const finalPing = Math.max(18, Math.min(99, node.ping + offset + randomJitter));
-
-    return {
-      ...node,
-      ping: finalPing,
-      isRecommended: finalPing <= 40,
-    };
-  });
-
-  // Filter 1: Strictly <= 100ms (as strictly requested: "ping 100 နဲ့ အောက် server များသာ")
-  let filtered = processedNodes.filter((node) => node.ping <= maxPing);
-
-  // Filter 2: Protocol if specified
+  let filtered = scoredNodes.filter((node) => node.ping <= maxPing);
   if (protocolFilter !== 'all') {
     filtered = filtered.filter((node) => node.protocol.toLowerCase() === protocolFilter.toLowerCase());
   }
 
-  // SORT: From lowest ping to highest ping (as strictly requested: "နည်းမှများရာသို့စီစဉ်ထည့်သွင်းရမည်")
   filtered.sort((a, b) => a.ping - b.ping);
+  storage.saveNodes(filtered);
 
   res.json({
     status: 'success',
@@ -370,9 +283,102 @@ Return ONLY a valid JSON array of objects conforming to this schema without any 
   });
 });
 
-// API: Network Diagnostics & Auto-Tuning
+// REST: AI Intent
+app.post('/api/ai/intent', async (req, res) => {
+  try {
+    const { query, userApiKey } = req.body;
+    const currentNodes = storage.getNodes();
+    const result = await hybridAi.parseIntentAndOptimize(query || 'general', currentNodes, userApiKey);
+    res.json({ status: 'success', ...result });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// REST: AI Self Heal, Repair & Report
+app.post('/api/ai/self-heal', async (req, res) => {
+  try {
+    const { activeNodeId } = req.body;
+    const currentNodes = storage.getNodes();
+    const report = await diagnosticReporter.executeSelfHealAndReport(currentNodes, activeNodeId || null);
+    res.json({ status: 'success', report });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// REST: Tunnel Connect
+app.post('/api/tunnel/connect', async (req, res) => {
+  try {
+    const { node } = req.body;
+    if (!node) {
+      return res.status(400).json({ status: 'error', message: 'Node object is required' });
+    }
+
+    const startResult = await xrayController.startTunnel(node);
+    if (startResult.success) {
+      metricsEngine.updateActivePing(node.ping);
+      storage.logEvent('TUNNEL_CONNECTED', `Connected to ${node.name} on SOCKS5 :10808 / HTTP :10809`);
+    }
+
+    res.json({
+      status: startResult.success ? 'success' : 'error',
+      message: startResult.message,
+      tunnelStatus: xrayController.getStatus(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// REST: Tunnel Disconnect
+app.post('/api/tunnel/disconnect', async (req, res) => {
+  try {
+    const stopResult = await xrayController.stopTunnel();
+    storage.logEvent('TUNNEL_DISCONNECTED', 'Tunnel stopped by user command');
+    res.json({
+      status: 'success',
+      message: stopResult.message,
+      tunnelStatus: xrayController.getStatus(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// REST: Tunnel Status
+app.get('/api/tunnel/status', (req, res) => {
+  res.json({
+    status: 'success',
+    tunnel: xrayController.getStatus(),
+    hasBinary: xrayController.hasBinary(),
+  });
+});
+
+// SSE: Live Telemetry
+app.get('/api/tunnel/telemetry-stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const sendMetrics = (metrics: any) => {
+    const payload = JSON.stringify({
+      metrics,
+      tunnel: xrayController.getStatus(),
+    });
+    res.write(`data: ${payload}\n\n`);
+  };
+
+  metricsEngine.on('telemetry', sendMetrics);
+
+  req.on('close', () => {
+    metricsEngine.off('telemetry', sendMetrics);
+  });
+});
+
+// REST: Network Diagnostics
 app.get('/api/network-diagnostics', (req, res) => {
-  // Simulated real-time network inspection
   const dnsOptions = [
     { name: 'Cloudflare DoH (Primary)', ip: '1.1.1.1', latencyMs: 14, status: 'Active (AI Auto-Tuned)' },
     { name: 'Google DNS (Fallback)', ip: '8.8.8.8', latencyMs: 22, status: 'Standby' },
@@ -403,23 +409,23 @@ app.get('/api/network-diagnostics', (req, res) => {
   });
 });
 
-// API: Export standard V2Ray Subscription (Base64)
+// REST: Export Subscription
 app.post('/api/export-subscription', (req, res) => {
   const { nodeKeys = [] } = req.body;
+  const nodes = storage.getNodes();
   const rawList = Array.isArray(nodeKeys) && nodeKeys.length > 0
     ? nodeKeys.join('\n')
-    : CURATED_SEED_NODES.map((n) => n.rawKey).join('\n');
+    : nodes.map((n) => n.rawKey).join('\n');
 
   const base64Sub = Buffer.from(rawList).toString('base64');
   res.json({
     status: 'success',
     subscriptionBase64: base64Sub,
-    nodeCount: Array.isArray(nodeKeys) ? nodeKeys.length : CURATED_SEED_NODES.length,
+    nodeCount: Array.isArray(nodeKeys) ? nodeKeys.length : nodes.length,
     v2rayngUrl: `sub://${base64Sub}`,
   });
 });
 
-// Start Full-stack Express server with Vite middleware in dev or static files in production
 async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
@@ -438,7 +444,8 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[AI V2Ray Client] Server running on http://0.0.0.0:${PORT}`);
+    console.log(`[AI V2Ray Enterprise] Server running on http://0.0.0.0:${PORT}`);
+    console.log(`[AI V2Ray Enterprise] SOCKS5 Inbound: 127.0.0.1:10808 | HTTP Inbound: 127.0.0.1:10809`);
   });
 }
 
