@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.AiV2RayClient" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#16181b</item>
+        <item name="android:navigationBarColor">#16181b</item>
+    </style>
+</resources>
