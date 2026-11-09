@@ -3,7 +3,6 @@ package com.victorgeek.aiv2rayclient.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
@@ -15,18 +14,6 @@ import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * =========================================================================
- * AI V2RAY CLIENT - ENTERPRISE ANDROID NATIVE VPNSERVICE
- * Designed & Engineered by Victor Geek
- *
- * Architecture:
- * 1. Establishes virtual TUN interface (`tun0`) capturing all device traffic.
- * 2. Bridges TUN packets to local SOCKS5 proxy (127.0.0.1:10808) via Tun2Socks.
- * 3. Embeds and manages Xray-core Go runtime binary process.
- * 4. Integrates Local Edge AI watchdog for sub-second auto-failover.
- * =========================================================================
- */
 class AiV2RayVpnService : VpnService() {
 
     companion object {
@@ -72,24 +59,20 @@ class AiV2RayVpnService : VpnService() {
 
         serviceScope.launch {
             try {
-                // 1. Write Xray configuration to private app storage
                 val configFile = File(filesDir, "xray_config.json")
                 FileOutputStream(configFile).use { it.write(configJson.toByteArray()) }
 
-                // 2. Start embedded Xray-core binary or Go runtime
                 startXrayCore(configFile.absolutePath)
 
-                // 3. Configure Android VpnService Builder
                 val builder = Builder()
                     .setSession("AI V2Ray Enterprise ($serverName)")
                     .setMtu(1420)
                     .addAddress("10.0.8.2", 24)
-                    .addRoute("0.0.0.0", 0) // Route all IPv4 traffic
-                    .addDnsServer("1.1.1.1") // Cloudflare Anti-Filter DoH
+                    .addRoute("0.0.0.0", 0)
+                    .addDnsServer("1.1.1.1")
                     .addDnsServer("8.8.8.8")
                     .setBlocking(false)
 
-                // Disallow VPN loopback to Xray outbound socket
                 try {
                     builder.addDisallowedApplication(packageName)
                 } catch (e: Exception) {
@@ -99,14 +82,11 @@ class AiV2RayVpnService : VpnService() {
                 vpnInterface = builder.establish()
                 Log.i(TAG, "VPN TUN Interface established successfully: fd=${vpnInterface?.fd}")
 
-                // 4. Start Tun2Socks Native Engine
                 startTun2Socks(vpnInterface?.fd ?: -1)
-
-                // Update notification to Active
                 updateNotification("Protected via $serverName (Ping < 35ms)")
 
             } catch (e: Exception) {
-                Log.error(TAG, "VPN start failed", e)
+                Log.e(TAG, "VPN start failed", e)
                 stopVpnTunnel()
             }
         }
@@ -137,7 +117,7 @@ class AiV2RayVpnService : VpnService() {
             vpnInterface?.close()
             vpnInterface = null
         } catch (e: Exception) {
-            Log.error(TAG, "Error stopping VPN", e)
+            Log.e(TAG, "Error stopping VPN", e)
         }
 
         stopForeground(true)
@@ -176,8 +156,4 @@ class AiV2RayVpnService : VpnService() {
         super.onDestroy()
         stopVpnTunnel()
     }
-}
-
-private fun Log.Companion.error(tag: String, msg: String, tr: Throwable) {
-    Log.e(tag, msg, tr)
 }

@@ -1,0 +1,1 @@
+-keep class com.victorgeek.aiv2rayclient.** { *; }
