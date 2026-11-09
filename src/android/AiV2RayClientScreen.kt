@@ -673,19 +673,100 @@ fun BrushedSteelKeyCap(
 
 @Composable
 fun IndustrialSettingsTray() {
+    var apiKeyInput by remember { mutableStateOf("") }
+    var isSaved by remember { mutableStateOf(true) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(ChamferShape9dp)
             .background(IndustrialTheme.RecessedTrayBackground)
             .border(1.dp, IndustrialTheme.MachinedBorder, ChamferShape9dp)
-            .padding(14.dp)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("CHASSIS CALIBRATION & ROUTING RULES", color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(6.dp))
-        Text("• DNS Tunnel: 1.1.1.1 (Cloudflare DoH)\n• MTU Calibration: 1420 bytes\n• TCP Mux Concurrency: 8 Channels\n• Carrier Handover: Instant Auto-Reconnect", color = Color.Gray, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Text(
+            text = "CHASSIS CALIBRATION & AI SETTINGS",
+            color = IndustrialTheme.CopperHighlightCap,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            text = "GEMINI AI API KEY (CLOUD RESEARCHER & MINING):",
+            color = Color(0xFF8B949E),
+            fontSize = 9.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color(0xFF131518))
+                .border(1.dp, IndustrialTheme.CopperFront, RoundedCornerShape(4.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            BasicTextField(
+                value = apiKeyInput,
+                onValueChange = {
+                    apiKeyInput = it
+                    isSaved = false
+                },
+                textStyle = TextStyle(color = IndustrialTheme.CopperHighlightCap, fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (apiKeyInput.isEmpty()) {
+                Text(
+                    text = "Paste Gemini API Key here...",
+                    color = Color.Gray,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isSaved) "✓ API Key Active (Gemini 3.8 Flash)" else "Unsaved changes",
+                color = if (isSaved) IndustrialTheme.LedOnline else Color(0xFFE57373),
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            BrushedSteelKeyCap(onClick = { isSaved = true }) {
+                Text(
+                    text = "SAVE KEY",
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = IndustrialTheme.CopperHighlightCap
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = "TUNNEL PARAMETERS:",
+            color = Color(0xFF8B949E),
+            fontSize = 9.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        Text(
+            text = "DNS: 1.1.1.1 (Cloudflare DoH) | MTU: 1420 | Mux: 8 Channels",
+            color = Color.Gray,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace
+        )
     }
 }
+
+
 
 @Composable
 fun IndustrialAboutTray() {
