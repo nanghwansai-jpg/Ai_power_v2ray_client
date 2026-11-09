@@ -23,27 +23,24 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Grant execute permission for gradlew
-        working-directory: ./android-project
-        run: |
-          gradle wrapper
-          chmod +x gradlew
-
       - name: Build Android Release APK & Bundle (AAB)
         working-directory: ./android-project
         run: |
-          ./gradlew assembleRelease bundleRelease --no-daemon
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: AI-V2Ray-Client-APK
-          path: android-project/app/build/outputs/apk/release/*.apk
+          path: android-project/app/build/outputs/apk/**/*.apk
           retention-days: 30
 
       - name: Upload AAB Bundle Artifact
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: AI-V2Ray-Client-AAB
-          path: android-project/app/build/outputs/bundle/release/*.aab
+          path: android-project/app/build/outputs/bundle/**/*.aab
           retention-days: 30
