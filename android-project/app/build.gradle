@@ -15,9 +15,21 @@ android {
         versionName "1.0.0-ENTERPRISE"
     }
 
+    signingConfigs {
+        release {
+            storeFile file("release.keystore")
+            storePassword "victorgeek123"
+            keyAlias "aiv2ray"
+            keyPassword "victorgeek123"
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
