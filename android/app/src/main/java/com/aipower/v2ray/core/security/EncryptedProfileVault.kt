@@ -200,6 +200,11 @@ class EncryptedProfileVault(context: Context) {
     private fun getOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
+        if (vaultFile.exists() || backupFile.exists()) {
+            throw VaultKeyUnavailableException(
+                "Encrypted profile key is missing; refusing to replace an unreadable vault."
+            )
+        }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(
