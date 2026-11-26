@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.aipower.v2ray.core.security.EncryptedProfileVault
 import com.aipower.v2ray.core.vpn.ImportedXrayProfile
 import com.aipower.v2ray.core.vpn.XrayProfileParser
 import com.aipower.v2ray.vpn.XrayVpnService
@@ -132,9 +133,73 @@ class MainActivity : ComponentActivity() {
                             Text(if (busy) "Validating..." else "Import and validate")
                         }
 
+                        OutlinedButton(
+                            onClick = {
+                                Thread {
+                                    try {
+                                        val saved = EncryptedProfileVault(this@MainActivity).load()
+                                        runOnUiThread {
+                                            if (saved == null) {
+                                                status = "No saved profile was found in the encrypted local vault."
+                                            } else {
+                                                profile = saved
+                                                inputText = ""
+                                                status = "Loaded encrypted profile: ${saved.displayName}"
+                                            }
+                                        }
+                                    } catch (error: Exception) {
+                                        runOnUiThread {
+                                            status = error.message ?: "Could not decrypt the saved profile."
+                                        }
+                                    }
+                                }.start()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Load saved profile")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                Thread {
+                                    try {
+                                        EncryptedProfileVault(this@MainActivity).delete()
+                                        runOnUiThread { status = "Saved encrypted profile deleted." }
+                                    } catch (error: Exception) {
+                                        runOnUiThread {
+                                            status = error.message ?: "Could not delete the saved profile."
+                                        }
+                                    }
+                                }.start()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Delete saved profile")
+                        }
+
                         profile?.let { imported ->
                             Spacer(Modifier.height(8.dp))
                             Text("Selected: ${imported.displayName}")
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    Thread {
+                                        try {
+                                            EncryptedProfileVault(this@MainActivity).save(imported)
+                                            runOnUiThread {
+                                                status = "Profile encrypted and saved locally in Android Keystore vault."
+                                            }
+                                        } catch (error: Exception) {
+                                            runOnUiThread {
+                                                status = error.message ?: "Could not save encrypted profile."
+                                            }
+                                        }
+                                    }.start()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Save securely")
+                            }
                             Spacer(Modifier.height(8.dp))
                             Button(
                                 onClick = {
@@ -171,7 +236,7 @@ class MainActivity : ComponentActivity() {
                         Text(status, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "Profiles are parsed locally. Subscription URL fetching, encrypted profile storage, QR scanning, and live tunnel diagnostics are next-stage work.",
+                            text = "Profiles are parsed locally. Saved profiles use AES-256-GCM with a non-exportable Android Keystore key and remain in app-private no-backup storage. QR scanning, subscription URL fetching, and live tunnel diagnostics are next-stage work.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
