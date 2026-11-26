@@ -69,7 +69,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.x"
+          go-version: "1.27.3"
           cache: false
 
       - name: Set up Python
@@ -105,6 +105,17 @@ jobs:
         run: |
           set -euo pipefail
           gradle :android:app:assembleRelease :android:app:bundleRelease
+
+      - name: Verify test-only fault injection is absent from release APK
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
+          test -n "$APK"
+          if unzip -Z1 "$APK" | grep -E '^classes[0-9]*\.dex$' | while read -r dex; do unzip -p "$APK" "$dex"; done | strings | grep -Fq 'AI_POWER_V4_FAULT_INJECTION_TEST_ONLY'; then
+            echo "::error::Test-only native V4 fault injection marker found in release APK"
+            exit 1
+          fi
+          echo "Verified: test-only native V4 fault injection marker is absent from release APK."
 
       - name: Generate SHA-256 checksums
         run: |
