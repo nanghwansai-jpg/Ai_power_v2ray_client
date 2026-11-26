@@ -73,14 +73,14 @@ jobs:
           keytool -genkeypair -noprompt \
             -keystore "$RUNNER_TEMP/ci-release-inspection.keystore" \
             -storepass ci-inspection-store-password \
-            -keypass ci-inspection-key-password \
+            -keypass ci-inspection-store-password \
             -alias ci-inspection \
             -dname "CN=CI Release Inspection" \
             -keyalg RSA -keysize 2048 -validity 2
           ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/ci-release-inspection.keystore" \
           ANDROID_KEYSTORE_PASSWORD="ci-inspection-store-password" \
           ANDROID_KEY_ALIAS="ci-inspection" \
-          ANDROID_KEY_PASSWORD="ci-inspection-key-password" \
+          ANDROID_KEY_PASSWORD="ci-inspection-store-password" \
             gradle :android:app:assembleRelease
           APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
           test -n "$APK"
