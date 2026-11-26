@@ -14,7 +14,7 @@ import (
 
 var (
 	ErrV4ShareInputTooLarge = errors.New("profile input exceeds supported size")
-	ErrV4ShareOutputTooLarge = ErrV4ShareOutputTooLarge
+	ErrV4ShareOutputTooLarge = errors.New("profile output exceeds supported size")
 )
 
 const (
