@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(libs.junit)
     // Generated from the pinned XTLS/libXray source by scripts/build-libxray-android.sh.
     implementation(fileTree("libs") { include("*.aar") })
 }
