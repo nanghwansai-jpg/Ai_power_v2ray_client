@@ -19,18 +19,24 @@ class XrayVpnService : VpnService() {
     private var runtime: LibXrayRuntime? = null
     private var coreStarted = false
     private val destroyed = AtomicBoolean(false)
+    private val foregroundLock = Any()
     @Volatile private var foregroundActive = false
+    @Volatile private var latestStartId = 0
     private val worker = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (destroyed.get()) return START_NOT_STICKY
+        synchronized(foregroundLock) {
+            latestStartId = startId
+            if (intent?.action == ACTION_START) startInForeground()
+        }
         when (intent?.action) {
             ACTION_STOP -> executeOnWorker(startId) {
-                stopTunnel()
-                stopSelf(startId)
+                stopTunnel(removeForeground = false)
+                finishStopIfCurrent(startId)
             }
 
             ACTION_START -> {
-                startInForeground()
                 val rawConfig = intent.getStringExtra(EXTRA_XRAY_JSON)
                 if (rawConfig.isNullOrBlank() || rawConfig.length > MAX_CONFIG_CHARS) {
                     executeOnWorker(startId) { stopWithError(startId) }
@@ -48,8 +54,8 @@ class XrayVpnService : VpnService() {
             }
 
             else -> executeOnWorker(startId) {
-                stopTunnel()
-                stopSelf(startId)
+                stopTunnel(removeForeground = false)
+                finishStopIfCurrent(startId)
             }
         }
         return START_NOT_STICKY
@@ -183,11 +189,33 @@ class XrayVpnService : VpnService() {
     }
 
     private fun stopWithError(startId: Int) {
-        stopTunnel()
-        // Post a separate, non-ongoing notification after removing the FGS
-        // notification. Android may suppress it when notification permission is denied.
-        postFailureNotification()
-        stopSelf(startId)
+        stopTunnel(removeForeground = false)
+        synchronized(foregroundLock) {
+            // An older start failure must not remove the foreground notification
+            // belonging to a newer start/stop request.
+            if (latestStartId == startId) {
+                removeForegroundNotification()
+                // Android may suppress this when notification permission is denied.
+                postFailureNotification()
+                stopSelf(startId)
+            }
+        }
+    }
+
+    private fun finishStopIfCurrent(startId: Int) {
+        synchronized(foregroundLock) {
+            if (latestStartId == startId) {
+                removeForegroundNotification()
+                stopSelf(startId)
+            }
+        }
+    }
+
+    private fun removeForegroundNotification() {
+        if (foregroundActive) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            foregroundActive = false
+        }
     }
 
     @Synchronized
@@ -201,10 +229,7 @@ class XrayVpnService : VpnService() {
         runtime = null
         runCatching { tun?.close() }
         tun = null
-        if (removeForeground && foregroundActive) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            foregroundActive = false
-        }
+        if (removeForeground) removeForegroundNotification()
     }
 
     override fun onRevoke() {
