@@ -95,7 +95,7 @@ jobs:
             -alias "$KEY_ALIAS" >/dev/null
 
           # keytool -list does not unlock the private key; a CSR does.
-          keytool -certreq -noprompt \
+          keytool -certreq \
             -storetype PKCS12 \
             -keystore "$KEYSTORE" \
             -storepass "$STORE_PASSWORD" \
