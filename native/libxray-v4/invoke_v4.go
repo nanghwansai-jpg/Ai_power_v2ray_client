@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
+		"io"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -66,15 +65,17 @@ func InvokeV4(requestJSON string) (response string) {
 		return encodeV4Failure(nil, nil, "INVALID_REQUEST", "PROTOCOL", false)
 	}
 	root, ok := parsed.(map[string]any)
-	if !ok || !hasExactV4Fields(root, "apiVersion", "requestId", "method", "payload") {
+	if !ok {
 		return encodeV4Failure(nil, nil, "INVALID_REQUEST", "PROTOCOL", false)
 	}
-
 	if value, ok := root["requestId"].(string); ok && v4RequestIDPattern.MatchString(value) {
 		requestID = &value
 	}
 	if value, ok := root["method"].(string); ok && len(value) <= 64 && isV4ASCII(value) {
 		method = &value
+	}
+	if !hasExactV4Fields(root, "apiVersion", "requestId", "method", "payload") {
+		return encodeV4Failure(requestID, method, "INVALID_REQUEST", "PROTOCOL", false)
 	}
 	if requestID == nil || method == nil {
 		return encodeV4Failure(requestID, method, "INVALID_REQUEST", "PROTOCOL", false)
@@ -117,10 +118,6 @@ func InvokeV4(requestJSON string) (response string) {
 		code, category := v4MethodError(*method)
 		return encodeV4Failure(requestID, method, code, category, false)
 	}
-	if err := validateV4Result(*method, data); err != nil {
-		return encodeV4Failure(requestID, method, "INTERNAL_ERROR", "INTERNAL", false)
-	}
-
 	budget := maxV4ControlBytes
 	if *method == string(LibXrayMethodConvertShareLinksToXrayJson) {
 		budget = maxV4ProfileBytes
@@ -131,6 +128,9 @@ func InvokeV4(requestJSON string) (response string) {
 	dataJSON, err := json.Marshal(data)
 	if err != nil || len(dataJSON) > budget {
 		return encodeV4Failure(requestID, method, "RESPONSE_TOO_LARGE", "LIMIT", false)
+	}
+	if err := validateV4Result(*method, dataJSON); err != nil {
+		return encodeV4Failure(requestID, method, "INTERNAL_ERROR", "INTERNAL", false)
 	}
 	envelope := v4Response{
 		APIVersion: libXrayV4APIVersion,
@@ -266,7 +266,7 @@ func validateV4Payload(method string, payload map[string]any) error {
 		}
 		if age, exists := payload["age"]; exists {
 			ageObject, ok := age.(map[string]any)
-			if !ok || !onlyV4Fields(ageObject, "secretKey") {
+			if !ok || !hasExactV4Fields(ageObject, "secretKey") {
 				return errors.New("invalid age payload")
 			}
 			secret, ok := ageObject["secretKey"].(string)
@@ -337,15 +337,11 @@ func executeV4Method(method string, payload map[string]any) (any, error) {
 	}
 }
 
-func validateV4Result(method string, data any) error {
+func validateV4Result(method string, dataJSON []byte) error {
 	switch method {
 	case string(LibXrayMethodConvertShareLinksToXrayJson):
-		raw, err := json.Marshal(data)
-		if err != nil {
-			return err
-		}
 		var root map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &root); err != nil || len(root) != 1 {
+		if err := json.Unmarshal(dataJSON, &root); err != nil || len(root) != 1 {
 			return errors.New("invalid converted profile")
 		}
 		var outbounds []json.RawMessage
@@ -353,17 +349,17 @@ func validateV4Result(method string, data any) error {
 			return errors.New("invalid converted outbounds")
 		}
 	case string(LibXrayMethodTestXray):
-		if _, ok := data.(struct{}); !ok {
+		if string(dataJSON) != "{}" {
 			return errors.New("invalid test result")
 		}
 	case string(LibXrayMethodRunXray):
-		result, ok := data.(map[string]bool)
-		if !ok || len(result) != 1 || !result["started"] {
+		var result map[string]bool
+		if err := json.Unmarshal(dataJSON, &result); err != nil || len(result) != 1 || !result["started"] {
 			return errors.New("invalid start result")
 		}
 	case string(LibXrayMethodStopXray):
-		result, ok := data.(map[string]bool)
-		if !ok || len(result) != 1 || !result["stopped"] {
+		var result map[string]bool
+		if err := json.Unmarshal(dataJSON, &result); err != nil || len(result) != 1 || !result["stopped"] {
 			return errors.New("invalid stop result")
 		}
 	}
@@ -451,6 +447,6 @@ func estimateV4JSONSize(value reflect.Value, limit int) int {
 		}
 		return total
 	default:
-		return fmt.Sprintf("%v", value.Interface()) != "" // unreachable for supported response types
+		return limit + 1
 	}
 }
