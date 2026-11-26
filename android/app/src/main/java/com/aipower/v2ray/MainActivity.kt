@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
                             minLines = 4,
                             maxLines = 7,
                             placeholder = {
-                                Text("vless://, vmess://, trojan://, ss://, socks://, or Xray JSON")
+                                Text("VLESS, VMess AEAD, Trojan, Shadowsocks, SOCKS, Hysteria2, or Xray JSON")
                             }
                         )
                         Spacer(Modifier.height(10.dp))
