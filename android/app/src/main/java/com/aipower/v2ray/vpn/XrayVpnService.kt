@@ -19,6 +19,7 @@ class XrayVpnService : VpnService() {
     private var runtime: LibXrayRuntime? = null
     private var coreStarted = false
     private val destroyed = AtomicBoolean(false)
+    @Volatile private var foregroundActive = false
     private val worker = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -146,6 +147,7 @@ class XrayVpnService : VpnService() {
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+        foregroundActive = true
     }
 
     private fun updateNotification(message: String) {
@@ -199,8 +201,9 @@ class XrayVpnService : VpnService() {
         runtime = null
         runCatching { tun?.close() }
         tun = null
-        if (removeForeground) {
+        if (removeForeground && foregroundActive) {
             stopForeground(STOP_FOREGROUND_REMOVE)
+            foregroundActive = false
         }
     }
 
