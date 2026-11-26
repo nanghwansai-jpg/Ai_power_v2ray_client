@@ -63,7 +63,7 @@ func TestInvokeV4MalformedAndDuplicateKeysFailClosed(t *testing.T) {
 		if err := json.Unmarshal([]byte(InvokeV4(request)), &response); err != nil {
 			t.Fatalf("failure envelope is not valid JSON: %v", err)
 		}
-		if response.Success || response.Code != "INVALID_REQUEST" || response.Error == nil || response.Data != nil {
+		if response.Success || response.Code != "INVALID_REQUEST" || response.Error == nil || string(response.Data) != "null" {
 			t.Fatalf("request did not fail closed: request=%q response=%+v", request, response)
 		}
 	}
