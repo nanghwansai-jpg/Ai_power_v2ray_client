@@ -88,7 +88,7 @@ class XrayVpnService : VpnService() {
         }
 
         val config = JSONObject(rawConfig)
-        engine.invoke("testXray", JSONObject().put("xrayJson", config.toString()))
+        engine.testXrayV4(config.toString())
         val env = config.optJSONObject("env") ?: JSONObject().also {
             config.put("env", it)
         }
@@ -115,15 +115,12 @@ class XrayVpnService : VpnService() {
                 "libXray Android DNS protection API is unavailable"
             }
             tunEnv.put("fd", descriptor.fd)
-            engine.invoke(
-                "runXray",
-                JSONObject().put("xrayJson", config.toString())
-            )
+            engine.runXrayV4(config.toString())
             runtime = engine
             coreStarted = true
             updateNotification("VPN connected")
         } catch (error: Exception) {
-            runCatching { engine.invoke("stopXray") }
+            runCatching { engine.stopXrayV4() }
             runCatching { engine.resetDns() }
             runCatching { engine.clearSocketProtector() }
             runCatching { descriptor.close() }
@@ -223,7 +220,7 @@ class XrayVpnService : VpnService() {
     @Synchronized
     private fun stopTunnel(removeForeground: Boolean = true) {
         if (coreStarted) {
-            runCatching { runtime?.invoke("stopXray") }
+            runCatching { runtime?.stopXrayV4() }
         }
         runCatching { runtime?.resetDns() }
         runCatching { runtime?.clearSocketProtector() }
