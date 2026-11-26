@@ -48,6 +48,7 @@ class XrayVpnService : VpnService() {
         return START_NOT_STICKY
     }
 
+    @Synchronized
     private fun startTunnel(rawConfig: String) {
         val engine = LibXrayRuntime(this)
         check(engine.registerSocketProtector()) {
@@ -147,6 +148,7 @@ class XrayVpnService : VpnService() {
         stopSelf()
     }
 
+    @Synchronized
     private fun stopTunnel(removeForeground: Boolean = true) {
         if (coreStarted) {
             runCatching { runtime?.invoke("stopXray") }
@@ -167,15 +169,13 @@ class XrayVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        worker.execute {
-            stopTunnel()
-            stopSelf()
-        }
+        stopTunnel()
+        stopSelf()
         super.onRevoke()
     }
 
     override fun onDestroy() {
-        worker.shutdown()
+        worker.shutdownNow()
         stopTunnel()
         super.onDestroy()
     }
