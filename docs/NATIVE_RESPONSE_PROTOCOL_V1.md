@@ -76,7 +76,9 @@ A bounded writer alone is not sufficient if the JSON encoder first buffers the e
 
 Do not silently change the upstream API v3 contract.
 
-The app-specific native patch will add a separate exported `InvokeV4(string) string` entrypoint and retain upstream `Invoke` v3 behavior. Android production code will call only `InvokeV4` after the patched AAR and its API signatures are verified. The app will not silently fall back to v3.
+The app-specific native overlay adds a separate exported `InvokeV4(string) string` entrypoint and leaves upstream `Invoke` v3 source and wire behavior unchanged. Android production code must call only `InvokeV4` after the patched AAR and its API signatures are verified. The app must not silently fall back to v3.
+
+Request IDs are UUIDs (RFC 4122 textual form); Android generates one per call. A malformed JSON document, invalid UTF-8, or duplicate-key document cannot be correlated and returns `requestId: null` and `method: null`. If the document is valid JSON and contains a valid request ID and method but fails envelope or payload validation, the native response echoes those validated values. An invalid/missing request ID is always returned as null. Kotlin accepts a null request ID only for `INVALID_REQUEST` responses that it can associate with the single in-flight call that produced the malformed request; normal app requests always contain a UUID.
 
 V4 request envelope:
 
@@ -133,7 +135,9 @@ No native error string, profile text, hostname, IP, UUID, credential, or raw con
 | `runXray` | `xrayJson` | `{ "started": true }` | 64 KiB |
 | `stopXray` | empty object | `{ "stopped": true }` | 64 KiB |
 
-Control payloads and responses are limited to 64 KiB. Profile/configuration input and conversion output are limited to 2 MiB. The complete V4 JNI envelope has an absolute 4 MiB ceiling. All limits are measured in UTF-8 bytes. Native preflight must reject over-budget values before large JSON serialization allocations.
+Stop/control payloads and non-profile responses are limited to 64 KiB. Profile/configuration text and conversion output are limited to 2 MiB. The complete V4 JNI request and response each have an absolute 4 MiB ceiling. All limits are measured in UTF-8 bytes. The native overlay uses a conservative reflection-based JSON size estimate before marshaling and checks converted outbound count before serialization; it then enforces the encoded method budget and absolute envelope ceiling. The profile conversion result is additionally checked for a non-empty `outbounds` array with at most 256 entries.
+
+The V4 request parser rejects duplicate keys, unknown top-level and method payload fields, wrong types, missing required fields, invalid UTF-8, trailing JSON values, excessive nesting, excessive object fields, and excessive array elements. V4 operations are serialized with a native mutex. `runXray` and `testXray` are rejected with retryable `CORE_BUSY` while the core is active; `stopXray` is idempotent and succeeds when the core is already stopped.
 
 The V4 decoder must reject duplicate keys, unknown fields, wrong types, missing required fields, invalid UTF-8, trailing JSON values, excessive nesting, excessive object fields, and excessive array elements. It must validate the exact API version, UUID request ID, method allowlist, and method-specific payload schema.
 
@@ -152,6 +156,7 @@ The initial allowlist is:
 - `INVALID_CONFIG`
 - `CORE_START_FAILED`
 - `CORE_STOP_FAILED`
+- `CORE_BUSY`
 - `INTERNAL_ERROR`
 
 The public message is mapped in Kotlin. Native diagnostics remain private and must not be copied to Android logs or UI.
@@ -162,8 +167,19 @@ The public message is mapped in Kotlin. Native diagnostics remain private and mu
 2. Add the native V4 request/response models and strict request validation.
 3. Add method-specific input limits and typed dispatch for the four app methods.
 4. Add method-specific output preflight, bounded final encoding, structured error mapping, and V4 API tests.
-5. Add CI checks for patch SHA-256, source identity, generated AAR SHA-256, exact `javap` signatures, API-version probe, and smoke-call schemas.
-6. Only then implement the strict Kotlin parser and typed operation methods.
+5. Add CI checks for the full upstream SHA, native overlay SHA-256, patched source identity, generated AAR SHA-256, exact `javap` signatures, API-version probe, and smoke-call schemas.
+6. Only after the native contract and AAR gates pass, implement the strict Kotlin parser and typed operation methods.
 7. Keep PR #1 Draft, do not merge, and keep production release on HOLD until device tests and all native/Kotlin gates pass.
 
 A generated AAR checksum identifies one CI artifact; it is not a claim of byte-for-byte reproducibility. Reproducible-build verification is a separate gate.
+
+
+## 8. Current implementation status (branch work in progress)
+
+- Added an app-owned native overlay at `native/libxray-v4/invoke_v4.go` with a separate `InvokeV4` export; upstream `invoke.go` and v3 behavior are not edited.
+- Added strict duplicate-key-aware JSON token parsing, UUID request correlation, exact envelope/payload fields, API version and method allowlists, UTF-8 byte limits, depth/field/array limits, structured error envelopes, panic sanitization, and serialized V4 execution.
+- Added typed dispatch for the four Android methods, including idempotent stop and active-core rejection for test/start.
+- Added conservative output-size preflight before `json.Marshal`, conversion outbound-count preflight, and final encoded-size checks.
+- Added native V4 regression tests and CI build integration. These changes are not considered verified until the latest branch CI completes successfully and the generated AAR signatures and test results are inspected.
+- Android still uses the v3 `Invoke` entry point at this stage. Do not enable V4 in app runtime until Kotlin strict response validation is implemented and tested.
+- The build script now pins the full upstream commit and records overlay/source/AAR checksums in a CI provenance artifact. The recorded AAR checksum identifies that build artifact; it is not a reproducibility claim.
