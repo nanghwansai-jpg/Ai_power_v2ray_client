@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
             var showStartupGoal by remember { mutableStateOf(store.setting("startup_goal_done", "false") != "true" && store.setting("startup_assistant", "true") == "true") }
             var dnsMode by remember { mutableStateOf(store.setting("dns_mode", "Cloudflare (1.1.1.1)") ) }
             var routingMode by remember { mutableStateOf(store.setting("routing_mode", "Global VPN")) }
+            var routingPackages by remember { mutableStateOf(store.setting("routing_packages", "")) }
             var benchmarkLimit by remember { mutableStateOf(store.setting("benchmark_limit", "50")) }
 
             val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -179,7 +180,7 @@ class MainActivity : ComponentActivity() {
                                     }.start()
                                 }
                             }, { screen = Screen.SETTINGS }, { store.log("INFO", "AGENT", "Local recovery diagnostics requested"); logs = store.logs(); aiReply = "Local Agent is active. No validated profile health probe is available yet; import a profile and run a connection test." })
-                            Screen.NETWORK -> NetworkScreen(dnsMode, { dnsMode = it; store.putSetting("dns_mode", it); store.log("INFO", "NETWORK", "DNS preference set: $it"); logs = store.logs() }, routingMode, { routingMode = it; store.putSetting("routing_mode", it); store.log("INFO", "NETWORK", "Routing preference set: $it"); logs = store.logs() })
+                            Screen.NETWORK -> NetworkScreen(dnsMode, { dnsMode = it; store.putSetting("dns_mode", it); store.log("INFO", "NETWORK", "DNS preference set: $it"); logs = store.logs() }, routingMode, { routingMode = it; store.putSetting("routing_mode", it); store.log("INFO", "NETWORK", "Routing preference set: $it"); logs = store.logs() }, routingPackages, { routingPackages = it; store.putSetting("routing_packages", it) })
                             Screen.SETTINGS -> SettingsScreen(
                                 apiKey, { apiKey = it }, { 
                                     runCatching { store.saveGeminiKey(apiKey.trim()); apiKey = ""; status = "Gemini key encrypted and saved in Android Keystore."; store.log("INFO", "SETTINGS", "Gemini API key updated") }
@@ -399,19 +400,36 @@ private fun AgentScreen(
 }
 
 @Composable
-private fun NetworkScreen(dns: String, onDns: (String) -> Unit, routing: String, onRouting: (String) -> Unit) {
+private fun NetworkScreen(
+    dns: String, onDns: (String) -> Unit,
+    routing: String, onRouting: (String) -> Unit,
+    packages: String, onPackages: (String) -> Unit
+) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Network Control", style = MaterialTheme.typography.headlineSmall)
-        Text("DNS preference")
+        Text("DNS resolver · applied on next VPN connection")
         listOf("Cloudflare (1.1.1.1)", "Google (8.8.8.8)", "Quad9 (9.9.9.9)").forEach { item ->
             Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = dns == item, onClick = { onDns(item) }); Text(item) }
         }
         Divider()
-        Text("Routing mode")
+        Text("App routing · applied on next VPN connection")
         listOf("Global VPN", "Allowlist / Split tunnel", "Blocklist").forEach { item ->
             Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = routing == item, onClick = { onRouting(item) }); Text(item) }
         }
-        Text("Preferences are saved locally. Applying per-app routing and DNS changes to the active tunnel requires the next VPN-service integration stage.")
+        if (routing != "Global VPN") {
+            OutlinedTextField(
+                value = packages,
+                onValueChange = onPackages,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                label = { Text("Android package names (comma separated)") },
+                placeholder = { Text("com.android.chrome, org.telegram.messenger") }
+            )
+            Text(if (routing == "Allowlist / Split tunnel")
+                "Only listed apps are routed into the VPN. An empty allowlist prevents tunnel startup."
+                else "Listed apps are excluded from the VPN; all other apps use the tunnel.")
+        }
+        Text("Use package names from Android App info. Unknown package names cause VPN startup to fail safely.")
     }
 }
 

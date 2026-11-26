@@ -101,19 +101,38 @@ class XrayVpnService : VpnService() {
             xrayEnv.put("tun", it)
         }
 
-        val descriptor = Builder()
+        val agentStore = AgentLocalStore(this)
+        val dnsAddress = when (agentStore.setting("dns_mode", "Cloudflare (1.1.1.1)")) {
+            "Google (8.8.8.8)" -> "8.8.8.8"
+            "Quad9 (9.9.9.9)" -> "9.9.9.9"
+            else -> "1.1.1.1"
+        }
+        val routingMode = agentStore.setting("routing_mode", "Global VPN")
+        val routingPackages = agentStore.setting("routing_packages", "")
+            .split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(100)
+        val vpnBuilder = Builder()
             .setSession("AI Power V2Ray Client")
             .setMtu(1500)
             .addAddress("10.111.0.1", 30)
             .addRoute("0.0.0.0", 0)
-            .addDnsServer("1.1.1.1")
+            .addDnsServer(dnsAddress)
             .addAddress("fd00:1111:2222::1", 126)
             .addRoute("::", 0)
-            .establish() ?: error("Android could not establish the VPN interface")
+
+        when (routingMode) {
+            "Allowlist / Split tunnel" -> {
+                require(routingPackages.isNotEmpty()) { "Allowlist routing requires at least one package name." }
+                routingPackages.forEach { vpnBuilder.addAllowedApplication(it) }
+            }
+            "Blocklist" -> routingPackages.forEach { vpnBuilder.addDisallowedApplication(it) }
+        }
+
+        val descriptor = vpnBuilder.establish()
+            ?: error("Android could not establish the VPN interface")
 
         tun = descriptor
         try {
-            check(engine.configureDns("1.1.1.1:53")) {
+            check(engine.configureDns("$dnsAddress:53")) {
                 "libXray Android DNS protection API is unavailable"
             }
             tunEnv.put("fd", descriptor.fd)
