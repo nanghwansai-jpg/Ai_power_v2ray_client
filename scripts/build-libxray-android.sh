@@ -29,6 +29,16 @@ esac
 )
 
 test -s "$WORK_DIR/libXray.aar"
+unzip -p "$WORK_DIR/libXray.aar" classes.jar > "$WORK_DIR/classes.jar"
+jar tf "$WORK_DIR/classes.jar" | grep -Fx "libXray/LibXray.class" >/dev/null
+API_SIGNATURES="$(javap -classpath "$WORK_DIR/classes.jar" libXray.LibXray)"
+for method in invoke registerDialerController setDNS resetDNS; do
+  if ! grep -qi "$method" <<< "$API_SIGNATURES"; then
+    echo "Generated libXray AAR is missing expected API method: $method" >&2
+    exit 1
+  fi
+done
+
 mkdir -p "$APP_LIBS_DIR"
 install -m 0644 "$WORK_DIR/libXray.aar" "$APP_LIBS_DIR/libXray.aar"
 echo "Built $APP_LIBS_DIR/libXray.aar from XTLS/libXray $LIBXRAY_VERSION"
