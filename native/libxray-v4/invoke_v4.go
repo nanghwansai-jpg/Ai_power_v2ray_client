@@ -28,7 +28,38 @@ const (
 )
 
 var (
-	v4RequestIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
+	v4RequestIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}package libXray
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io"
+	"reflect"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
+	"unicode/utf8"
+
+	"github.com/xtls/libxray/share"
+	"github.com/xtls/libxray/xray"
+)
+
+const (
+	libXrayV4APIVersion       = 4
+	maxV4AbsoluteBytes        = 4 * 1024 * 1024
+	maxV4ProfileBytes         = 2 * 1024 * 1024
+	maxV4ControlBytes         = 64 * 1024
+	maxV4NestingDepth         = 32
+	maxV4ObjectFields         = 64
+	maxV4ArrayElements        = 4096
+	maxV4ConvertedOutbounds   = 256
+)
+
+var (
+	)
+	errV4RequestTooLarge = errors.New("request exceeds method size limit")
 	v4InvokeMu sync.Mutex
 )
 
@@ -97,7 +128,13 @@ func InvokeV4(requestJSON string) (response string) {
 	if !isV4Method(*method) {
 		return encodeV4Failure(requestID, method, "UNSUPPORTED_METHOD", "PROTOCOL", false)
 	}
+	if *method == string(LibXrayMethodStopXray) && len(requestJSON) > maxV4ControlBytes {
+		return encodeV4Failure(requestID, method, "REQUEST_TOO_LARGE", "LIMIT", false)
+	}
 	if err := validateV4Payload(*method, payload); err != nil {
+		if errors.Is(err, errV4RequestTooLarge) {
+			return encodeV4Failure(requestID, method, "REQUEST_TOO_LARGE", "LIMIT", false)
+		}
 		return encodeV4Failure(requestID, method, "INVALID_REQUEST", "PROTOCOL", false)
 	}
 
@@ -265,8 +302,11 @@ func validateV4Payload(method string, payload map[string]any) error {
 			return errors.New("unknown convert payload field")
 		}
 		text, ok := payload["text"].(string)
-		if !ok || len(text) > maxV4ProfileBytes {
+		if !ok {
 			return errors.New("invalid profile text")
+		}
+		if len(text) > maxV4ProfileBytes {
+			return errV4RequestTooLarge
 		}
 		if age, exists := payload["age"]; exists {
 			ageObject, ok := age.(map[string]any)
@@ -274,8 +314,11 @@ func validateV4Payload(method string, payload map[string]any) error {
 				return errors.New("invalid age payload")
 			}
 			secret, ok := ageObject["secretKey"].(string)
-			if !ok || len(secret) > maxV4ControlBytes {
+			if !ok {
 				return errors.New("invalid age secret")
+			}
+			if len(secret) > maxV4ControlBytes {
+				return errV4RequestTooLarge
 			}
 		}
 	case string(LibXrayMethodTestXray), string(LibXrayMethodRunXray):
@@ -283,8 +326,11 @@ func validateV4Payload(method string, payload map[string]any) error {
 			return errors.New("invalid config payload")
 		}
 		config, ok := payload["xrayJson"].(string)
-		if !ok || len(config) == 0 || len(config) > maxV4ProfileBytes || !utf8.ValidString(config) {
+		if !ok || len(config) == 0 || !utf8.ValidString(config) {
 			return errors.New("invalid config")
+		}
+		if len(config) > maxV4ProfileBytes {
+			return errV4RequestTooLarge
 		}
 	case string(LibXrayMethodStopXray):
 		if len(payload) != 0 {
