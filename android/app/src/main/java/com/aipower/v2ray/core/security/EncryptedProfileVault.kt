@@ -309,6 +309,39 @@ class EncryptedProfileVault(context: Context) {
     }
 }
 
+/**
+ * Resolve an interrupted two-file replacement. If both paths exist, only an
+ * authenticated primary is considered committed; an incomplete primary is
+ * discarded in favor of the last known-good backup.
+ */
+internal fun recoverVaultReplacement(
+    primary: File,
+    backup: File,
+    isPrimaryValid: (File) -> Boolean,
+    moveFile: (File, File) -> Unit,
+    syncDirectory: (File) -> Unit
+) {
+    val parent = primary.parentFile ?: error("Vault directory is unavailable.")
+    if (!primary.exists() && backup.exists()) {
+        moveFile(backup, primary)
+        syncDirectory(parent)
+    } else if (primary.exists() && backup.exists()) {
+        // If key access is unavailable, the validator throws and both files
+        // remain untouched so recovery can be retried after the key is restored.
+        if (isPrimaryValid(primary)) {
+            if (!backup.delete()) {
+                error("Could not remove stale encrypted profile recovery file.")
+            }
+        } else {
+            if (!primary.delete()) {
+                error("Could not remove an incomplete replacement vault.")
+            }
+            moveFile(backup, primary)
+        }
+        syncDirectory(parent)
+    }
+}
+
 /** Reads at most maxBytes + 1 bytes, so a file that grows after stat cannot bypass the cap. */
 internal fun readVaultBounded(file: File, maxBytes: Long): ByteArray {
     require(maxBytes >= 0) { "Maximum vault size must not be negative." }
