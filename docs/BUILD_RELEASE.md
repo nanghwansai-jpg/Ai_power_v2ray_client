@@ -1,0 +1,51 @@
+# Android Build and Release
+
+## Automated debug build
+The `.github/workflows/android-ci.yml` workflow runs on pushes and pull requests targeting `main`, and can also be started manually. It builds the pinned XTLS/libXray v26.11.9 Android AAR from source first, then runs the unit-test task and builds the debug APK with JDK 17 and Gradle 8.13. The resulting debug APK is uploaded as a 14-day Actions artifact.
+
+## Signed release build
+The `.github/workflows/release.yml` workflow:
+1. Runs when a version tag matching `v*` is pushed, or manually for an existing tag.
+2. Builds the pinned XTLS/libXray v26.11.9 Android AAR from source.
+3. Requires the four signing secrets below.
+4. Builds both the signed APK and Android App Bundle.
+5. Generates SHA-256 checksums.
+6. Uploads build artifacts and publishes a GitHub Release.
+
+### Required GitHub Actions secrets
+Open repository **Settings → Secrets and variables → Actions → New repository secret** and add:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | Base64-encoded Android release keystore file |
+| `ANDROID_KEY_ALIAS` | Alias of the signing key |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_PASSWORD` | Key password |
+
+Create and retain the keystore securely outside the repository. Back it up safely: losing the signing key can prevent updates to an already-published Android app. Never commit the keystore, passwords, or signing material.
+
+To encode an existing keystore locally:
+```bash
+base64 -w 0 release-key.jks
+```
+Copy the output into `ANDROID_KEYSTORE_BASE64`. Do not paste it into chat or commit it.
+
+### Publish a version
+After the signing secrets are configured, create and push a version tag:
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+The workflow then builds and publishes the release. A manual run requires the name of an existing tag.
+
+## Current limitations
+- The pinned libXray integration and basic VPNService lifecycle are present, but the full end-to-end TUN forwarding path has not been verified on a physical Android device.
+- Profile import currently covers the native libXray conversion path; QR scanning, subscription URL management, and multi-profile Room management are not implemented.
+- A local single-profile vault is implemented with AES-256-GCM and an Android Keystore key. This is not yet a complete multi-profile repository or backup/restore system.
+- Cloudflare Worker services and AI Gateway are not implemented yet.
+- Release workflow execution and APK/AAB output have not yet been verified. The workflow will stop if signing secrets are missing.
+- No production-ready app should be distributed until VPN functionality, security, and device compatibility tests pass.
+
+
+## Xray native dependency
+Both CI and release workflows build XTLS/libXray v26.11.9 using Go 1.25, Python 3.12, Android SDK 36, and Android NDK 27.2.12479018. The AAR is generated into `android/app/libs` during the workflow and is not committed to Git. See [Xray integration](XRAY_INTEGRATION.md) for API and runtime constraints.
