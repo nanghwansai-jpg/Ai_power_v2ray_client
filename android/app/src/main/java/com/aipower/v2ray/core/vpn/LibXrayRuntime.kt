@@ -52,7 +52,7 @@ internal class LibXrayRuntime(
                 it.parameterTypes.size == 1 &&
                 it.parameterTypes[0].isInterface
         } ?: return
-        register.invoke(null, null)
+        register.invoke(null, *arrayOf<Any?>(null))
         socketController = null
     }
 
