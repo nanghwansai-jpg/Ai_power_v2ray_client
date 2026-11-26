@@ -8,6 +8,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.content.pm.ServiceInfo
+import java.util.concurrent.Executors
 import com.aipower.v2ray.core.vpn.LibXrayRuntime
 import org.json.JSONObject
 
@@ -15,12 +16,15 @@ class XrayVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var runtime: LibXrayRuntime? = null
     private var coreStarted = false
+    private val worker = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                stopTunnel()
-                stopSelf()
+                worker.execute {
+                    stopTunnel()
+                    stopSelf()
+                }
                 return START_NOT_STICKY
             }
             ACTION_START -> {
@@ -30,10 +34,13 @@ class XrayVpnService : VpnService() {
                     stopWithError("No Xray configuration was supplied")
                     return START_NOT_STICKY
                 }
-                try {
-                    startTunnel(rawConfig)
-                } catch (error: Exception) {
-                    stopWithError(error.message ?: "Unable to start VPN")
+                worker.execute {
+                    try {
+                        stopTunnel()
+                        startTunnel(rawConfig)
+                    } catch (error: Exception) {
+                        stopWithError(error.message ?: "Unable to start VPN")
+                    }
                 }
             }
             else -> stopSelf()
@@ -158,12 +165,15 @@ class XrayVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        stopTunnel()
-        stopSelf()
+        worker.execute {
+            stopTunnel()
+            stopSelf()
+        }
         super.onRevoke()
     }
 
     override fun onDestroy() {
+        worker.shutdown()
         stopTunnel()
         super.onDestroy()
     }
