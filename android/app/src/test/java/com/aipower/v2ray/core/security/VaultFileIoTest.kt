@@ -127,6 +127,28 @@ class VaultFileIoTest {
         assertEquals("old-ciphertext", backup.readText())
     }
 
+    @Test
+    fun keepsBackupWhenRecoveryMoveFails() {
+        val primary = File(temporaryFolder.root, "profiles.vault")
+        val backup = temporaryFolder.newFile("profiles.vault.bak").apply {
+            writeText("last-known-good-ciphertext")
+        }
+
+        assertThrows(java.io.IOException::class.java) {
+            recoverVaultReplacement(
+                primary,
+                backup,
+                isPrimaryValid = { true },
+                moveFile = { _, _ -> throw java.io.IOException("simulated move failure") },
+                syncDirectory = {}
+            )
+        }
+
+        assertFalse(primary.exists())
+        assertTrue(backup.exists())
+        assertEquals("last-known-good-ciphertext", backup.readText())
+    }
+
     private fun moveForTest(source: File, destination: File) {
         Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
