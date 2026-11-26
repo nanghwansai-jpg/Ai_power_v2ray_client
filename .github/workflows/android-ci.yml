@@ -67,10 +67,51 @@ jobs:
       - name: Run unit tests and build debug APK
         run: gradle :android:app:testDebugUnitTest :android:app:assembleDebug
 
-      - name: Build unsigned release variant and inspect DEX for test-only fault injection
+      - name: Build release variant and inspect DEX for test-only fault injection
         run: |
           set -euo pipefail
+
+          STORE_PASSWORD="ci-inspection-password"
+          KEY_ALIAS="ci-inspection"
+          KEYSTORE="$RUNNER_TEMP/ci-release-inspection.keystore"
+          CSR="$RUNNER_TEMP/ci-release-inspection.csr"
+
+          keytool -genkeypair -noprompt \
+            -storetype PKCS12 \
+            -keystore "$KEYSTORE" \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -dname "CN=CI Release Inspection" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 2
+
+          # Verify the keystore password and alias can be read.
+          keytool -list -v \
+            -storetype PKCS12 \
+            -keystore "$KEYSTORE" \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
+          # keytool -list does not unlock the private key; a CSR does.
+          keytool -certreq -noprompt \
+            -storetype PKCS12 \
+            -keystore "$KEYSTORE" \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -file "$CSR" >/dev/null
+          test -s "$CSR"
+          rm -f "$CSR"
+
+          export ANDROID_KEYSTORE_FILE="$KEYSTORE"
+          export ANDROID_KEYSTORE_PASSWORD="$STORE_PASSWORD"
+          export ANDROID_KEY_ALIAS="$KEY_ALIAS"
+          export ANDROID_KEY_PASSWORD="$STORE_PASSWORD"
+
           gradle :android:app:assembleRelease
+
           APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
           test -n "$APK"
           if unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' | while read -r dex; do unzip -p "$APK" "$dex"; done | strings | grep -F 'AI_POWER_V4_FAULT_INJECTION_TEST_ONLY' >/dev/null; then
