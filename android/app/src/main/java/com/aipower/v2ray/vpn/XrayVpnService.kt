@@ -71,7 +71,9 @@ class XrayVpnService : VpnService() {
             return
         }
         try {
-            worker.execute { block() }
+            worker.execute {
+                if (!destroyed.get()) block()
+            }
         } catch (_: RejectedExecutionException) {
             stopSelf(startId)
         }
@@ -232,25 +234,29 @@ class XrayVpnService : VpnService() {
         if (removeForeground) removeForegroundNotification()
     }
 
-    override fun onRevoke() {
-        executeOnWorker(startId = 0) {
+    private fun shutdownWorkerWithCleanup() {
+        // Queue cleanup behind any in-flight operation. Queued user actions
+        // check destroyed and are skipped; this final cleanup task still runs.
+        try {
+            worker.execute { stopTunnel() }
+        } catch (_: RejectedExecutionException) {
+            // Best-effort fallback for an already-terminated executor.
             stopTunnel()
-            stopSelf()
+        }
+        worker.shutdown()
+    }
+
+    override fun onRevoke() {
+        if (destroyed.compareAndSet(false, true)) {
+            shutdownWorkerWithCleanup()
         }
         super.onRevoke()
     }
 
     override fun onDestroy() {
         if (destroyed.compareAndSet(false, true)) {
-            // Queue cleanup behind any in-flight start/stop operation, then
-            // reject new work. Do not block Android's main thread waiting for native code.
-            try {
-                worker.execute { stopTunnel() }
-            } catch (_: RejectedExecutionException) {
-                // Best-effort fallback for an already-terminated executor.
-                stopTunnel()
-            }
-            worker.shutdown()
+            // Do not block Android's main thread waiting for native code.
+            shutdownWorkerWithCleanup()
         }
         super.onDestroy()
     }
