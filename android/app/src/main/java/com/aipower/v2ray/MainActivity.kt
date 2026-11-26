@@ -181,7 +181,9 @@ class MainActivity : ComponentActivity() {
                                             Thread {
                                                 try {
                                                     EncryptedProfileVault(this@MainActivity).delete()
-                                        runOnUiThread { status = "Saved encrypted profile deleted." }
+                                                    runOnUiThread {
+                                                        status = "Saved encrypted profile deleted."
+                                                    }
                                                 } catch (error: Exception) {
                                                     runOnUiThread {
                                                         status = error.message ?: "Could not delete the saved profile."
