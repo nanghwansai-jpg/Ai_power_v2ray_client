@@ -11,7 +11,7 @@ import org.json.JSONObject
  * Runtime startup fails closed when the pinned libXray artifact/API is unavailable.
  */
 internal class LibXrayRuntime(
-    private val vpnService: VpnService
+    private val vpnService: VpnService? = null
 ) {
     private val bindingClassName = "libXray.LibXray"
     private var socketController: Any? = null
@@ -32,7 +32,7 @@ internal class LibXrayRuntime(
             when (method.name.lowercase()) {
                 "protectfd" -> {
                     val fd = (args?.firstOrNull() as? Number)?.toInt() ?: -1
-                    fd >= 0 && vpnService.protect(fd)
+                    fd >= 0 && (vpnService?.protect(fd) ?: false)
                 }
                 "tostring" -> "AI Power VPN socket protector"
                 "hashcode" -> System.identityHashCode(this)
