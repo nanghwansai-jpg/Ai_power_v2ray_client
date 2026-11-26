@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-		"io"
+	"io"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -234,6 +234,7 @@ func hasExactV4Fields(object map[string]any, fields ...string) bool {
 }
 
 func isV4ASCII(value string) bool {
+	if len(value) == 0 { return false }
 	for _, char := range value {
 		if char < 0x21 || char > 0x7e {
 			return false
