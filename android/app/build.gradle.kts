@@ -18,7 +18,7 @@ if (releaseSigningPartiallyConfigured) {
     throw GradleException("Release signing is partially configured; all ANDROID_* signing values are required.")
 }
 
-val releaseKeystoreFile = releaseSigningEnv[0]?.let(::file)
+val releaseKeystoreFile = releaseSigningEnv[0]?.let { file(it) }
 if (releaseSigningConfigured && (releaseKeystoreFile == null || !releaseKeystoreFile.isFile)) {
     throw GradleException("Configured release keystore file does not exist.")
 }
