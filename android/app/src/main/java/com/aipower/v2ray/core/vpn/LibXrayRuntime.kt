@@ -45,6 +45,17 @@ internal class LibXrayRuntime(
         return true
     }
 
+    fun unregisterSocketProtector() {
+        val binding = bindingClass()
+        val register = binding.methods.firstOrNull {
+            it.name.equals("registerDialerController", ignoreCase = true) &&
+                it.parameterTypes.size == 1 &&
+                it.parameterTypes[0].isInterface
+        } ?: return
+        register.invoke(null, null)
+        socketController = null
+    }
+
     /**
      * libXray requires its Android DNS resolver to be configured before runXray
      * so the Go resolver does not recurse through the active VPN interface.
