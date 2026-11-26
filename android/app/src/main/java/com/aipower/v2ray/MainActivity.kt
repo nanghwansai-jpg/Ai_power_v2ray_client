@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aipower.v2ray.core.agent.AgentLocalStore
+import com.aipower.v2ray.core.agent.ServerCandidate
+import com.aipower.v2ray.core.agent.SubscriptionDiscovery
 import com.aipower.v2ray.core.security.EncryptedProfileVault
 import com.aipower.v2ray.core.vpn.ImportedXrayProfile
 import com.aipower.v2ray.core.vpn.XrayProfileParser
@@ -160,7 +162,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 { screen = Screen.SETTINGS }, { screen = Screen.LOGS }
                             )
-                            Screen.SERVERS -> ServersScreen(profile, inputText, { inputText = it }, { screen = Screen.HOME }, benchmarkLimit)
+                            Screen.SERVERS -> ServersScreen(profile, { screen = Screen.HOME }, { selected -> profile = selected; screen = Screen.HOME; status = "Selected server: ${selected.displayName}"; store.log("INFO", "SERVER", "User selected benchmarked server: ${selected.displayName}"); logs = store.logs() }, benchmarkLimit)
                             Screen.LOGS -> LogsScreen(logs, { logs = store.logs() }, { store.clearLogs(); logs = emptyList() })
                             Screen.AGENT -> AgentScreen(offlineMode, autoReconnect, startupAssistant, aiReply, prompt, { prompt = it }, {
                                 val question = prompt.trim()
@@ -271,20 +273,75 @@ private fun HomeScreen(
 }
 
 @Composable
-private fun ServersScreen(profile: ImportedXrayProfile?, input: String, onInput: (String) -> Unit, goHome: () -> Unit, limit: String) {
+private fun ServersScreen(
+    profile: ImportedXrayProfile?,
+    goHome: () -> Unit,
+    onSelect: (ImportedXrayProfile) -> Unit,
+    limit: String
+) {
+    var subscriptionUrl by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<List<ServerCandidate>>(emptyList()) }
+    var message by remember { mutableStateOf("Only scan subscription URLs you own or are authorized to use.") }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Server Intelligence", style = MaterialTheme.typography.headlineSmall)
-        Text("Node list is populated from profiles and subscriptions you explicitly provide. No public node has been tested unless a real probe result is shown.")
         Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) {
             Text("Current profile", style = MaterialTheme.typography.titleMedium)
-            Text(profile?.displayName ?: "No validated profile")
+            Text(profile?.displayName ?: "No selected profile")
             Text("Outbound count: ${profile?.outboundCount ?: 0}")
-            Text("Benchmark target: up to $limit candidates")
+            Text("Benchmark limit: max 50 candidate endpoints")
         } }
-        Text("Subscription URL", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(value = input, onValueChange = onInput, modifier = Modifier.fillMaxWidth(), placeholder = { Text("https://… (authorized subscription)") })
-        Text("Subscription fetching and real latency benchmarking are not enabled in this build. Candidate discovery will not fabricate ping values.")
-        Button(onClick = goHome, modifier = Modifier.fillMaxWidth()) { Text("Import profile") }
+        Text("HTTPS Subscription URL", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = subscriptionUrl,
+            onValueChange = { subscriptionUrl = it.take(2048) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("https://provider.example/subscription") },
+            singleLine = true
+        )
+        Text("The app fetches a bounded subscription, parses supported V2Ray links locally, and measures TCP connect latency to each public endpoint. TCP latency is not a full VPN speed test.")
+        Button(
+            enabled = !busy && subscriptionUrl.startsWith("https://"),
+            onClick = {
+                busy = true
+                message = "Fetching subscription and benchmarking up to $limit endpoints…"
+                Thread {
+                    val outcome = runCatching {
+                        SubscriptionDiscovery().discoverAndBenchmark(subscriptionUrl, limit.toIntOrNull()?.coerceIn(1, 50) ?: 50)
+                    }
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        busy = false
+                        outcome.onSuccess {
+                            result = it
+                            val reachable = it.count { candidate -> candidate.latencyMs != null }
+                            message = "Tested ${it.size} candidates · ${reachable} TCP reachable · sorted by measured latency"
+                        }.onFailure {
+                            result = emptyList()
+                            message = it.message ?: "Subscription discovery failed."
+                        }
+                    }
+                }.start()
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(if (busy) "Testing servers…" else "Fetch & Benchmark Servers") }
+        Text(message, style = MaterialTheme.typography.bodySmall)
+        result.forEachIndexed { index, candidate ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("#${index + 1} · ${candidate.profile.displayName}", style = MaterialTheme.typography.titleMedium)
+                    Text("${candidate.host}:${candidate.port}", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        candidate.latencyMs?.let { "TCP latency: ${it} ms" } ?: (candidate.failure ?: "No measurement"),
+                        color = if (candidate.latencyMs != null && candidate.latencyMs < 100) Color(0xFF80D6A5) else Color.LightGray
+                    )
+                    if (candidate.latencyMs != null) {
+                        Button(onClick = { onSelect(candidate.profile) }, modifier = Modifier.fillMaxWidth()) { Text("Select this server") }
+                    }
+                }
+            }
+        }
+        OutlinedButton(onClick = goHome, modifier = Modifier.fillMaxWidth()) { Text("Back to VPN") }
     }
 }
 
