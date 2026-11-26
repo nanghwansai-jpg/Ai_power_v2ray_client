@@ -36,7 +36,7 @@ class XrayVpnService : VpnService() {
                 }
                 worker.execute {
                     try {
-                        stopTunnel()
+                        stopTunnel(removeForeground = false)
                         startTunnel(rawConfig)
                     } catch (error: Exception) {
                         stopWithError(error.message ?: "Unable to start VPN")
@@ -147,7 +147,7 @@ class XrayVpnService : VpnService() {
         stopSelf()
     }
 
-    private fun stopTunnel() {
+    private fun stopTunnel(removeForeground: Boolean = true) {
         if (coreStarted) {
             runCatching { runtime?.invoke("stopXray") }
         }
@@ -156,11 +156,13 @@ class XrayVpnService : VpnService() {
         runtime = null
         runCatching { tun?.close() }
         tun = null
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
+        if (removeForeground) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
         }
     }
 
