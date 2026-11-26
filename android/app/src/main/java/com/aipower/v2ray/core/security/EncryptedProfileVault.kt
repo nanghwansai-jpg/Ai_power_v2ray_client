@@ -87,8 +87,11 @@ class EncryptedProfileVault(context: Context) {
                 moveWithFallback(temp, vaultFile)
                 syncParentDirectory(parent)
             } catch (error: Exception) {
-                if (!vaultFile.exists() && backupFile.exists()) {
-                    runCatching { moveWithFallback(backupFile, vaultFile) }
+                if (backupFile.exists()) {
+                    if (vaultFile.exists() && !vaultFile.delete()) {
+                        error("Could not remove an incomplete replacement vault.")
+                    }
+                    moveWithFallback(backupFile, vaultFile)
                     syncParentDirectory(parent)
                 }
                 throw error
@@ -169,18 +172,50 @@ class EncryptedProfileVault(context: Context) {
 
     private fun recoverInterruptedReplacement() {
         val parent = vaultFile.parentFile ?: return
-        if (!vaultFile.exists() && backupFile.exists()) {
-            moveWithFallback(backupFile, vaultFile)
-            syncParentDirectory(parent)
-        } else if (vaultFile.exists() && backupFile.exists()) {
-            // Primary is the commit point. The backup is stale after a completed swap.
-            if (!backupFile.delete()) {
-                error("Could not remove stale encrypted profile recovery file.")
-            }
-        }
+        recoverVaultReplacement(
+            primary = vaultFile,
+            backup = backupFile,
+            isPrimaryValid = ::isVaultCiphertextAuthenticated,
+            moveFile = ::moveWithFallback,
+            syncDirectory = ::syncParentDirectory
+        )
         parent.listFiles()
             ?.filter { it.name.startsWith("$VAULT_FILE.tmp-") }
             ?.forEach { runCatching { it.delete() } }
+    }
+
+    /**
+     * A destination can exist after a non-atomic fallback was interrupted.
+     * Never discard the backup merely because the primary path exists:
+     * authenticate the primary ciphertext first.
+     */
+    private fun isVaultCiphertextAuthenticated(file: File): Boolean {
+        val bytes = try {
+            readVaultBounded(file, MAX_VAULT_BYTES)
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+        if (bytes.size.toLong() !in MIN_VAULT_BYTES..MAX_VAULT_BYTES) return false
+        val key = getExistingKey()
+        val iv = bytes.copyOfRange(0, GCM_IV_BYTES)
+        val ciphertext = bytes.copyOfRange(GCM_IV_BYTES, bytes.size)
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        try {
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
+        } catch (error: KeyPermanentlyInvalidatedException) {
+            throw VaultKeyUnavailableException("Encrypted profile key was invalidated.", error)
+        } catch (error: UnrecoverableKeyException) {
+            throw VaultKeyUnavailableException("Encrypted profile key cannot be recovered.", error)
+        } catch (error: InvalidKeyException) {
+            throw VaultKeyUnavailableException("Encrypted profile key is unusable.", error)
+        }
+        cipher.updateAAD(AAD)
+        return try {
+            cipher.doFinal(ciphertext)
+            true
+        } catch (_: AEADBadTagException) {
+            false
+        }
     }
 
     private fun getExistingKey(): SecretKey {
