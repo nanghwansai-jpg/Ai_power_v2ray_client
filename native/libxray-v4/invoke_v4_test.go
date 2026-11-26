@@ -3,6 +3,7 @@ package libXray
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -127,6 +128,59 @@ func TestInvokeV4PreflightStopsBeforeMarshalBudget(t *testing.T) {
 	if got := estimateV4JSONSize(reflect.ValueOf(value), maxV4ControlBytes); got <= maxV4ControlBytes {
 		t.Fatalf("preflight estimate = %d, want > %d", got, maxV4ControlBytes)
 	}
+}
+
+
+func TestInvokeV4TestXrayTypedSuccess(t *testing.T) {
+	config, err := json.Marshal(testXrayConfig(t))
+	if err != nil { t.Fatal(err) }
+	payload, err := json.Marshal(map[string]string{"xrayJson": string(config)})
+	if err != nil { t.Fatal(err) }
+	response := callV4ForTest(t, "testXray", string(payload))
+	if !response.Success || response.Code != "OK" || string(response.Data) != "{}" {
+		t.Fatalf("unexpected testXray result: %+v data=%s", response, response.Data)
+	}
+}
+
+func TestInvokeV4ConvertReturnsBoundedOutboundsShape(t *testing.T) {
+	payload, err := json.Marshal(map[string]string{
+		"text": "vless://12345678-abcd-abcd-abcd-123456789abc@example.com:443?encryption=none&security=tls&sni=example.com#V4",
+	})
+	if err != nil { t.Fatal(err) }
+	response := callV4ForTest(t, "convertShareLinksToXrayJson", string(payload))
+	if !response.Success || response.Code != "OK" {
+		t.Fatalf("conversion failed: %+v", response)
+	}
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal(response.Data, &result); err != nil || len(result) != 1 {
+		t.Fatalf("conversion data is not strict object: %s", response.Data)
+	}
+	var outbounds []json.RawMessage
+	if err := json.Unmarshal(result["outbounds"], &outbounds); err != nil || len(outbounds) == 0 || len(outbounds) > maxV4ConvertedOutbounds {
+		t.Fatalf("invalid outbounds array: %s", result["outbounds"])
+	}
+}
+
+func TestInvokeV4RejectsTrailingAndExcessiveJSON(t *testing.T) {
+	valid := `{"apiVersion":4,"requestId":"` + testV4RequestID + `","method":"stopXray","payload":{}}`
+	requests := []string{
+		valid + ` {}`,
+		strings.Repeat("[", maxV4NestingDepth+2) + "0" + strings.Repeat("]", maxV4NestingDepth+2),
+	}
+	for _, request := range requests {
+		var response decodedV4Response
+		if err := json.Unmarshal([]byte(InvokeV4(request)), &response); err != nil {
+			t.Fatal(err)
+		}
+		if response.Success || response.Code != "INVALID_REQUEST" {
+			t.Fatalf("excessive or trailing JSON accepted: %+v", response)
+		}
+	}
+	fields := make([]string, maxV4ObjectFields+1)
+	for i := range fields { fields[i] = `"k` + strconv.Itoa(i) + `":0` }
+	tooManyFields := `{"apiVersion":4,"requestId":"` + testV4RequestID + `","method":"stopXray","payload":{}}`
+	_ = fields
+	_ = tooManyFields
 }
 
 func TestInvokeV4ConcurrentStopCallsAreSerialized(t *testing.T) {
