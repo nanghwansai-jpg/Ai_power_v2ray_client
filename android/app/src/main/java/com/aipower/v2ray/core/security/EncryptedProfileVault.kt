@@ -86,15 +86,15 @@ class EncryptedProfileVault(context: Context) {
             try {
                 moveWithFallback(temp, vaultFile)
                 syncParentDirectory(parent)
-            } catch (error: Exception) {
+            } catch (replacementError: Exception) {
                 if (backupFile.exists()) {
                     if (vaultFile.exists() && !vaultFile.delete()) {
-                        error("Could not remove an incomplete replacement vault.")
+                        throw IllegalStateException("Could not remove an incomplete replacement vault.")
                     }
                     moveWithFallback(backupFile, vaultFile)
                     syncParentDirectory(parent)
                 }
-                throw error
+                throw replacementError
             }
 
             if (backupFile.exists() && !backupFile.delete()) {
