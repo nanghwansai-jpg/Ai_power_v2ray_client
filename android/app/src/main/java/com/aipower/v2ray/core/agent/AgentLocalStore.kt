@@ -31,6 +31,16 @@ class AgentLocalStore(context: Context) {
         }
     }
 
+    /** Persist only non-sensitive crash metadata synchronously before Android terminates the process. */
+    fun logFatal(threadName: String, errorType: String) {
+        synchronized(LOCK) {
+            val old = prefs.getString("diagnostics", "").orEmpty()
+            val line = "${System.currentTimeMillis()}|FATAL|CRASH|thread=${threadName.take(48)} type=${errorType.take(80)}"
+            val entries = (old.lineSequence().filter { it.isNotBlank() } + line).toList().takeLast(MAX_LOGS)
+            prefs.edit().putString("diagnostics", entries.joinToString("\n")).commit()
+        }
+    }
+
     fun logs(): List<String> = prefs.getString("diagnostics", "").orEmpty()
         .lineSequence().filter { it.isNotBlank() }.toList().takeLast(MAX_LOGS).reversed()
 

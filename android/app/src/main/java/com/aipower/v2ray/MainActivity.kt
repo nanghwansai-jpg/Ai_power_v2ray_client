@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aipower.v2ray.core.agent.AgentLocalStore
+import com.aipower.v2ray.core.agent.AgentCrashHandler
 import com.aipower.v2ray.core.agent.ServerCandidate
 import com.aipower.v2ray.core.agent.SubscriptionDiscovery
 import com.aipower.v2ray.core.security.EncryptedProfileVault
@@ -46,6 +47,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = AgentLocalStore(this)
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        if (previousHandler !is AgentCrashHandler) {
+            Thread.setDefaultUncaughtExceptionHandler(AgentCrashHandler(store, previousHandler))
+        }
         setContent {
             var screen by remember { mutableStateOf(Screen.HOME) }
             var inputText by remember { mutableStateOf("") }
