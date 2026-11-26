@@ -45,14 +45,30 @@ internal class LibXrayRuntime(
         return true
     }
 
-    fun unregisterSocketProtector() {
+    fun clearSocketProtector() {
         val binding = bindingClass()
         val register = binding.methods.firstOrNull {
             it.name.equals("registerDialerController", ignoreCase = true) &&
                 it.parameterTypes.size == 1 &&
                 it.parameterTypes[0].isInterface
         } ?: return
-        register.invoke(null, *arrayOf<Any?>(null))
+
+        // libXray wraps this callback and does not accept null safely. Replace it
+        // with a detached fail-closed controller instead of retaining the Service.
+        val controllerType = register.parameterTypes[0]
+        val disabledController = Proxy.newProxyInstance(
+            controllerType.classLoader,
+            arrayOf(controllerType)
+        ) { _, method, _ ->
+            when (method.name.lowercase()) {
+                "protectfd" -> false
+                "tostring" -> "Inactive AI Power VPN socket protector"
+                "hashcode" -> System.identityHashCode(this)
+                "equals" -> false
+                else -> defaultValue(method.returnType)
+            }
+        }
+        register.invoke(null, disabledController)
         socketController = null
     }
 
