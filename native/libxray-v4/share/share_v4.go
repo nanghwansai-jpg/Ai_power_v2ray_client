@@ -114,7 +114,7 @@ func filterBuildableOutboundsV4(config *conf.Config) (*conf.Config, error) {
 	}
 	raw, err := json.Marshal(config.OutboundConfigs)
 	if err != nil || len(raw) > maxV4ShareOutputBytes {
-		return nil, errors.New("profile output exceeds supported size")
+		return nil, ErrV4ShareOutputTooLarge
 	}
 	var validationOutbounds []conf.OutboundDetourConfig
 	if err := json.Unmarshal(raw, &validationOutbounds); err != nil {
@@ -131,20 +131,23 @@ func filterBuildableOutboundsV4(config *conf.Config) (*conf.Config, error) {
 		return nil, errors.New("no valid outbound found")
 	}
 	if len(validOutbounds) > maxV4ShareOutbounds {
-		return nil, errors.New("outbound count limit")
+		return nil, ErrV4ShareOutputTooLarge
 	}
 	config.OutboundConfigs = validOutbounds
 	return config, nil
 }
 
 func marshalShareConfigJSONV4(config *conf.Config) (json.RawMessage, error) {
-	if config == nil || len(config.OutboundConfigs) == 0 || len(config.OutboundConfigs) > maxV4ShareOutbounds {
-		return nil, errors.New("outbound count limit")
+	if config == nil || len(config.OutboundConfigs) == 0 {
+		return nil, errors.New("no valid outbound found")
+	}
+	if len(config.OutboundConfigs) > maxV4ShareOutbounds {
+		return nil, ErrV4ShareOutputTooLarge
 	}
 	outbounds := make([]map[string]any, 0, len(config.OutboundConfigs))
 	for _, outbound := range config.OutboundConfigs {
 		if estimateShareJSONSize(reflect.ValueOf(outbound), maxV4ShareOutputBytes+1) > maxV4ShareOutputBytes {
-			return nil, errors.New("profile output exceeds supported size")
+			return nil, ErrV4ShareOutputTooLarge
 		}
 		source, err := marshalShareJSONObject(outbound)
 		if err != nil {
