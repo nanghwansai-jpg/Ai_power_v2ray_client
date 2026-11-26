@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, security/android-v3-hardening]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -111,14 +111,12 @@ jobs:
             -keysize 2048 \
             -validity 2
 
-          # Verify the keystore password and alias can be read.
           keytool -list -v \
             -storetype PKCS12 \
             -keystore "$KEYSTORE" \
             -storepass "$STORE_PASSWORD" \
             -alias "$KEY_ALIAS" >/dev/null
 
-          # keytool -list does not unlock the private key; a CSR does.
           keytool -certreq \
             -storetype PKCS12 \
             -keystore "$KEYSTORE" \
