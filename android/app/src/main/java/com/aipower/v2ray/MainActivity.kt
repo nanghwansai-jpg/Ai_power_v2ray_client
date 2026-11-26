@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +48,7 @@ class MainActivity : ComponentActivity() {
             var profile by remember { mutableStateOf<ImportedXrayProfile?>(null) }
             var status by remember { mutableStateOf("Paste a supported V2Ray/Xray link or JSON profile.") }
             var busy by remember { mutableStateOf(false) }
+            var showDeleteConfirmation by remember { mutableStateOf(false) }
 
             val permissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult()
@@ -160,21 +163,42 @@ class MainActivity : ComponentActivity() {
                         }
 
                         OutlinedButton(
-                            onClick = {
-                                Thread {
-                                    try {
-                                        EncryptedProfileVault(this@MainActivity).delete()
-                                        runOnUiThread { status = "Saved encrypted profile deleted." }
-                                    } catch (error: Exception) {
-                                        runOnUiThread {
-                                            status = error.message ?: "Could not delete the saved profile."
-                                        }
-                                    }
-                                }.start()
-                            },
+                            onClick = { showDeleteConfirmation = true },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Delete saved profile")
+                        }
+
+                        if (showDeleteConfirmation) {
+                            AlertDialog(
+                                onDismissRequest = { showDeleteConfirmation = false },
+                                title = { Text("Delete saved profile?") },
+                                text = { Text("This removes the encrypted profile file and its Android Keystore key. This action cannot be undone.") },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showDeleteConfirmation = false
+                                            Thread {
+                                                try {
+                                                    EncryptedProfileVault(this@MainActivity).delete()
+                                        runOnUiThread { status = "Saved encrypted profile deleted." }
+                                                } catch (error: Exception) {
+                                                    runOnUiThread {
+                                                        status = error.message ?: "Could not delete the saved profile."
+                                                    }
+                                                }
+                                            }.start()
+                                        }
+                                    ) {
+                                        Text("Delete")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeleteConfirmation = false }) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
                         }
 
                         profile?.let { imported ->
