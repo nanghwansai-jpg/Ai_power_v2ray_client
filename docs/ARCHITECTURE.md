@@ -5,7 +5,7 @@ AI Power V2Ray Client is an Android VPN client built with Kotlin, Jetpack Compos
 
 ## Architecture principles
 - Clean Architecture with feature-oriented UI modules.
-- Android VPNService owns the OS tunnel lifecycle; the Xray adapter owns core integration.
+- Android VPNService owns the OS tunnel lifecycle; the XTLS/libXray gomobile adapter owns Xray-core lifecycle, TUN FD handoff, socket protection, and Android DNS resolver integration. The adapter is pinned to libXray v26.11.9.
 - Room stores structured local data; DataStore stores preferences.
 - Android Keystore protects encryption keys.
 - Deterministic policy rules govern autonomous actions. AI may recommend actions but cannot execute arbitrary shell commands or code.
