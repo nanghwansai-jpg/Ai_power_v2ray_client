@@ -72,16 +72,24 @@ class NativeV4ResponseParserTest {
     }
 
     @Test fun acceptsNullCorrelationOnlyForInvalidRequest() {
-        try {
-            NativeV4ResponseParser.parse(
-                """{"apiVersion":4,"requestId":null,"method":null,"success":false,"code":"INVALID_REQUEST","data":null,"error":{"category":"PROTOCOL","retryable":false}}""",
-                id,
-                "testXray"
-            )
-            fail("Expected NativeV4Exception")
-        } catch (e: NativeV4Exception) {
-            assertEquals(NativeV4ErrorCode.INVALID_REQUEST, e.code)
+        val bothNull = """{"apiVersion":4,"requestId":null,"method":null,"success":false,"code":"INVALID_REQUEST","data":null,"error":{"category":"PROTOCOL","retryable":false}}"""
+        val nullId = """{"apiVersion":4,"requestId":null,"method":"testXray","success":false,"code":"INVALID_REQUEST","data":null,"error":{"category":"PROTOCOL","retryable":false}}"""
+        val nullMethod = """{"apiVersion":4,"requestId":"$id","method":null,"success":false,"code":"INVALID_REQUEST","data":null,"error":{"category":"PROTOCOL","retryable":false}}"""
+        listOf(bothNull, nullId, nullMethod).forEach { raw ->
+            try {
+                NativeV4ResponseParser.parse(raw, id, "testXray")
+                fail("Expected NativeV4Exception")
+            } catch (e: NativeV4Exception) {
+                assertEquals(NativeV4ErrorCode.INVALID_REQUEST, e.code)
+            }
         }
+    }
+
+    @Test fun rejectsMismatchedNonNullCorrelationOnInvalidRequest() {
+        val wrongId = """{"apiVersion":4,"requestId":"123e4567-e89b-12d3-a456-426614174001","method":"testXray","success":false,"code":"INVALID_REQUEST","data":null,"error":{"category":"PROTOCOL","retryable":false}}"""
+        val wrongMethod = """{"apiVersion":4,"requestId":"$id","method":"runXray","success":false,"code":"INVALID_REQUEST","data":null,"error":{"category":"PROTOCOL","retryable":false}}"""
+        expectFailure { NativeV4ResponseParser.parse(wrongId, id, "testXray") }
+        expectFailure { NativeV4ResponseParser.parse(wrongMethod, id, "testXray") }
     }
 
     @Test fun rejectsNullCorrelationForOtherFailureCodes() {
