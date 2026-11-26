@@ -1,7 +1,7 @@
 # Xray Core and Android VPN Integration
 
 ## Selected engine
-The Android client uses the official XTLS/libXray gomobile wrapper, pinned to **v26.11.9**. That wrapper embeds the matching Xray-core release and exposes a structured JSON entry point:
+The Android client uses the official XTLS/libXray gomobile wrapper, pinned to **v26.11.9**. That wrapper embeds the matching Xray-core release and exposes a structured JSON entry point. Android sends **Invoke API version 3**, matching `LibXrayAPIVersion = 3` in the pinned source. The Kotlin adapter allowlists only the four operations required by this app and bounds request/response strings:
 - `testXray` validates an Xray JSON configuration.
 - `runXray` starts the managed core.
 - `stopXray` stops it.
@@ -34,7 +34,7 @@ The Gradle app module consumes AAR files in `android/app/libs`. If the AAR is ab
 7. The service invokes `runXray`, maintains a foreground notification, and calls `stopXray` / resets DNS on shutdown or VPN revocation.
 
 ## Current limitations
-- The UI now accepts supported share-link text or Xray JSON, parses it locally, and exposes Connect/Disconnect controls. Encrypted profile persistence, QR scanning, and subscription URL fetching are not implemented.
+- The UI accepts supported share-link text or Xray JSON, parses it locally, and exposes Connect/Disconnect controls. One profile can be saved in the encrypted Android Keystore-backed local vault; Room-based multi-profile management, QR scanning, and subscription URL fetching are not implemented.
 - The service expects a valid, complete Xray JSON profile in its start intent; the UI converts supported share links to that JSON before starting it. Subscription URL fetching and QR import remain future work.
 - IPv4 and IPv6 default routes are configured. IPv6 reachability, DNS leak behavior, socket protection, and traffic forwarding still require device-level tests.
 - The runtime adapter discovers gomobile-generated Java methods reflectively. The generated class/method names and native callback behavior still need runtime verification; a successful Gradle compile alone does not prove compatibility.
