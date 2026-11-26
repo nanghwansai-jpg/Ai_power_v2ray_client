@@ -245,6 +245,7 @@ class XrayVpnService : VpnService() {
         } catch (_: RejectedExecutionException) {
             // Best-effort fallback for an already-terminated executor.
             stopTunnel()
+            if (stopServiceAfterCleanup) stopSelf()
         }
         worker.shutdown()
     }
