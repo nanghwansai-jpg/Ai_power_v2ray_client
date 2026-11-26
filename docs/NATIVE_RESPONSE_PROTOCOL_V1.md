@@ -137,7 +137,7 @@ No native error string, profile text, hostname, IP, UUID, credential, or raw con
 
 Stop/control payloads and non-profile responses are limited to 64 KiB. Profile/configuration text and conversion output are limited to 2 MiB. The complete V4 JNI request and response each have an absolute 4 MiB ceiling. All limits are measured in UTF-8 bytes. The native overlay uses a conservative reflection-based JSON size estimate before marshaling and checks converted outbound count before serialization; it then enforces the encoded method budget and absolute envelope ceiling. The profile conversion result is additionally checked for a non-empty `outbounds` array with at most 256 entries.
 
-The V4 request parser rejects duplicate keys, unknown top-level and method payload fields, wrong types, missing required fields, invalid UTF-8, trailing JSON values, excessive nesting, excessive object fields, and excessive array elements. V4 operations are serialized with a native mutex. `runXray` and `testXray` are rejected with retryable `CORE_BUSY` while the core is active; `stopXray` is idempotent and succeeds when the core is already stopped.
+The V4 request parser rejects duplicate keys, unknown top-level and method payload fields, wrong types, missing required fields, invalid UTF-8, trailing JSON values, excessive nesting, excessive object fields, and excessive array elements. V4 operations are serialized with a native mutex. V4 share conversion uses a separate share-package entrypoint so upstream V3 behavior is preserved; decrypted plaintext, intermediate outbound validation JSON, projected output and final conversion JSON are each bounded to the V4 2 MiB budget before large marshaling operations. `runXray` and `testXray` are rejected with retryable `CORE_BUSY` while the core is active; `stopXray` is idempotent and succeeds when the core is already stopped.
 
 The V4 decoder must reject duplicate keys, unknown fields, wrong types, missing required fields, invalid UTF-8, trailing JSON values, excessive nesting, excessive object fields, and excessive array elements. It must validate the exact API version, UUID request ID, method allowlist, and method-specific payload schema.
 
@@ -159,7 +159,7 @@ The initial allowlist is:
 - `CORE_BUSY`
 - `INTERNAL_ERROR`
 
-The public message is mapped in Kotlin. Native diagnostics remain private and must not be copied to Android logs or UI.
+Error categories are restricted to `PROTOCOL`, `VALIDATION`, `ENGINE`, `LIMIT`, and `INTERNAL`. The public message is mapped in Kotlin. Native diagnostics remain private and must not be copied to Android logs or UI.
 
 ## 7. Implementation sequence and gates
 
@@ -177,9 +177,10 @@ A generated AAR checksum identifies one CI artifact; it is not a claim of byte-f
 ## 8. Current implementation status (branch work in progress)
 
 - Added an app-owned native overlay at `native/libxray-v4/invoke_v4.go` with a separate `InvokeV4` export; upstream `invoke.go` and v3 behavior are not edited.
+- Added a separate V4 share converter at `native/libxray-v4/share/share_v4.go`; unlike the upstream share converter, it caps decrypted plaintext and performs outbound/intermediate/final output preflight before its JSON marshaling stages.
 - Added strict duplicate-key-aware JSON token parsing, UUID request correlation, exact envelope/payload fields, API version and method allowlists, UTF-8 byte limits, depth/field/array limits, structured error envelopes, panic sanitization, and serialized V4 execution.
 - Added typed dispatch for the four Android methods, including idempotent stop and active-core rejection for test/start.
 - Added conservative output-size preflight before `json.Marshal`, conversion outbound-count preflight, and final encoded-size checks.
-- Added native V4 regression tests and CI build integration. These changes are not considered verified until the latest branch CI completes successfully and the generated AAR signatures and test results are inspected.
+- Added native V4 and share-package regression tests and CI build integration. These changes are not considered verified until the latest branch CI completes successfully and the generated AAR signatures and test results are inspected.
 - Android still uses the v3 `Invoke` entry point at this stage. Do not enable V4 in app runtime until Kotlin strict response validation is implemented and tested.
 - The build script now pins the full upstream commit and records overlay/source/AAR checksums in a CI provenance artifact. The recorded AAR checksum identifies that build artifact; it is not a reproducibility claim.
