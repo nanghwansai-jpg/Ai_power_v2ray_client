@@ -154,9 +154,7 @@ func InvokeV4(requestJSON string) (response string) {
 			return encodeV4Failure(requestID, method, "RESPONSE_TOO_LARGE", "LIMIT", false)
 		}
 	}
-	if err := validateV4ResultPreflight(*method, data); err != nil {
-		return encodeV4Failure(requestID, method, "INTERNAL_ERROR", "INTERNAL", false)
-	}
+
 	if err := validateV4Result(*method, dataJSON); err != nil {
 		return encodeV4Failure(requestID, method, "INTERNAL_ERROR", "INTERNAL", false)
 	}
