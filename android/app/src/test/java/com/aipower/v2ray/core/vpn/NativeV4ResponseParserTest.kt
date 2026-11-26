@@ -119,11 +119,10 @@ class NativeV4ResponseParserTest {
         expectFailure { NativeV4ResponseParser.parse(highOnly, id, "testXray") }
         val lowOnly = response().replace("\"method\":\"testXray\"", "\"method\":\"\\uDC00\"")
         expectFailure { NativeV4ResponseParser.parse(lowOnly, id, "testXray") }
-        val pair = response("testXray", """{"label":"\uD83D\uDE80"}""")
-        assertEquals(NativeV4Result.ConfigValid, NativeV4ResponseParser.parse(pair, id, "testXray").let {
-            // testXray deliberately requires an empty object, so the pair test is exercised in a valid envelope string field.
-            it
-        }.let { NativeV4Result.ConfigValid })
+        val pair = response("convertShareLinksToXrayJson", """{"outbounds":[{"tag":"\uD83D\uDE80"}]}""")
+        val parsed = NativeV4ResponseParser.parse(pair, id, "convertShareLinksToXrayJson")
+        assertTrue(parsed is NativeV4Result.ConvertedProfile)
+        assertTrue((parsed as NativeV4Result.ConvertedProfile).configJson.contains("🚀"))
     }
 
     @Test fun rejectsUnpairedRawUtf16SurrogateBeforeByteCounting() {
