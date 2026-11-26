@@ -14,6 +14,7 @@ internal class LibXrayRuntime(
     private val vpnService: VpnService
 ) {
     private val bindingClassName = "libXray.LibXray"
+    private var socketController: Any? = null
 
     fun registerSocketProtector(): Boolean {
         val binding = bindingClass()
@@ -40,7 +41,34 @@ internal class LibXrayRuntime(
             }
         }
         register.invoke(null, controller)
+        socketController = controller
         return true
+    }
+
+    /**
+     * libXray requires its Android DNS resolver to be configured before runXray
+     * so the Go resolver does not recurse through the active VPN interface.
+     */
+    fun configureDns(server: String): Boolean {
+        val controller = socketController ?: return false
+        val binding = bindingClass()
+        val setDns = binding.methods.firstOrNull {
+            it.name.equals("setDNS", ignoreCase = true) &&
+                it.parameterTypes.size == 2 &&
+                it.parameterTypes[0].isInstance(controller) &&
+                it.parameterTypes[1] == String::class.java
+        } ?: return false
+        setDns.invoke(null, controller, server)
+        return true
+    }
+
+    fun resetDns() {
+        val reset = bindingClass().methods.firstOrNull {
+            it.name.equals("resetDNS", ignoreCase = true) &&
+                it.parameterTypes.isEmpty()
+        } ?: return
+        reset.invoke(null)
+        socketController = null
     }
 
     fun invoke(method: String, payload: JSONObject = JSONObject()): JSONObject {
