@@ -91,6 +91,7 @@ class XrayVpnService : VpnService() {
             coreStarted = true
             updateNotification("VPN connected")
         } catch (error: Exception) {
+            runCatching { engine.invoke("stopXray") }
             runCatching { engine.resetDns() }
             descriptor.close()
             tun = null
