@@ -1,7 +1,6 @@
 package share
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -263,4 +262,3 @@ func estimateShareJSONValue(value reflect.Value, limit, depth int) int {
 	}
 }
 
-var _ = bytes.MinRead
