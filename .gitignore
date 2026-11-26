@@ -1,4 +1,6 @@
 # Gradle / Android
+.build/
+android/app/libs/*.aar
 .gradle/
 **/build/
 local.properties
