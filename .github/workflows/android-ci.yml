@@ -67,21 +67,10 @@ jobs:
       - name: Run unit tests and build debug APK
         run: gradle :android:app:testDebugUnitTest :android:app:assembleDebug
 
-      - name: Build release variant and inspect DEX for test-only fault injection
+      - name: Build unsigned release variant and inspect DEX for test-only fault injection
         run: |
           set -euo pipefail
-          keytool -genkeypair -noprompt \
-            -keystore "$RUNNER_TEMP/ci-release-inspection.keystore" \
-            -storepass ci-inspection-store-password \
-            -keypass ci-inspection-store-password \
-            -alias ci-inspection \
-            -dname "CN=CI Release Inspection" \
-            -keyalg RSA -keysize 2048 -validity 2
-          ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/ci-release-inspection.keystore" \
-          ANDROID_KEYSTORE_PASSWORD="ci-inspection-store-password" \
-          ANDROID_KEY_ALIAS="ci-inspection" \
-          ANDROID_KEY_PASSWORD="ci-inspection-store-password" \
-            gradle :android:app:assembleRelease
+          gradle :android:app:assembleRelease
           APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
           test -n "$APK"
           if unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' | while read -r dex; do unzip -p "$APK" "$dex"; done | strings | grep -F 'AI_POWER_V4_FAULT_INJECTION_TEST_ONLY' >/dev/null; then
