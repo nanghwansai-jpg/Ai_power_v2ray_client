@@ -27,11 +27,15 @@ fi
 # and tests are overlaid as separate same-package Go files.
 install -m 0644 "$OVERLAY_DIR/invoke_v4.go" "$WORK_DIR/invoke_v4.go"
 install -m 0644 "$OVERLAY_DIR/invoke_v4_test.go" "$WORK_DIR/invoke_v4_test.go"
-gofmt -w "$WORK_DIR/invoke_v4.go" "$WORK_DIR/invoke_v4_test.go"
+mkdir -p "$WORK_DIR/share"
+install -m 0644 "$OVERLAY_DIR/share/share_v4.go" "$WORK_DIR/share/share_v4.go"
+install -m 0644 "$OVERLAY_DIR/share/share_v4_test.go" "$WORK_DIR/share/share_v4_test.go"
+gofmt -w "$WORK_DIR/invoke_v4.go" "$WORK_DIR/invoke_v4_test.go" "$WORK_DIR/share/share_v4.go" "$WORK_DIR/share/share_v4_test.go"
 
 (
   cd "$WORK_DIR"
   go test -run '^(TestInvokeV4|TestInvokeAPIVersion|TestInvokeNoDataResponseShape)' .
+  go test -run '^TestV4Share' ./share
   python3 build/main.py android
 )
 
@@ -52,7 +56,7 @@ fi
 
 mkdir -p "$APP_LIBS_DIR"
 install -m 0644 "$WORK_DIR/libXray.aar" "$APP_LIBS_DIR/libXray.aar"
-OVERLAY_TREE_HASH="$(sha256sum "$OVERLAY_DIR/invoke_v4.go" "$OVERLAY_DIR/invoke_v4_test.go" | sha256sum | awk '{print $1}')"
+OVERLAY_TREE_HASH="$(sha256sum "$OVERLAY_DIR/invoke_v4.go" "$OVERLAY_DIR/invoke_v4_test.go" "$OVERLAY_DIR/share/share_v4.go" "$OVERLAY_DIR/share/share_v4_test.go" | sha256sum | awk '{print $1}')"
 mkdir -p "$WORK_DIR/provenance"
 {
   echo "upstream_repository=https://github.com/XTLS/libXray"
@@ -63,8 +67,10 @@ mkdir -p "$WORK_DIR/provenance"
   echo "invoke_v4_java_signature=$(grep -A1 -E 'invokeV4\(java\.lang\.String\)' <<< "$API_SIGNATURES" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')"
   echo "native_overlay_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4.go" | awk '{print $1}')"
   echo "native_tests_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4_test.go" | awk '{print $1}')"
-  echo "native_patch_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4.go" "$OVERLAY_DIR/invoke_v4_test.go" | sha256sum | awk '{print $1}')"
-  echo "compiled_overlay_sha256=$(sha256sum "$WORK_DIR/invoke_v4.go" "$WORK_DIR/invoke_v4_test.go" | sha256sum | awk '{print $1}')"
+  echo "share_overlay_sha256=$(sha256sum "$OVERLAY_DIR/share/share_v4.go" | awk '{print $1}')"
+  echo "share_tests_sha256=$(sha256sum "$OVERLAY_DIR/share/share_v4_test.go" | awk '{print $1}')"
+  echo "native_patch_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4.go" "$OVERLAY_DIR/invoke_v4_test.go" "$OVERLAY_DIR/share/share_v4.go" "$OVERLAY_DIR/share/share_v4_test.go" | sha256sum | awk '{print $1}')"
+  echo "compiled_overlay_sha256=$(sha256sum "$WORK_DIR/invoke_v4.go" "$WORK_DIR/invoke_v4_test.go" "$WORK_DIR/share/share_v4.go" "$WORK_DIR/share/share_v4_test.go" | sha256sum | awk '{print $1}')"
   echo "patched_source_tree_identity=${ACTUAL_COMMIT}+${OVERLAY_TREE_HASH}"
   echo "aar_sha256=$(sha256sum "$WORK_DIR/libXray.aar" | awk '{print $1}')"
   echo "go_version=$(go version)"
