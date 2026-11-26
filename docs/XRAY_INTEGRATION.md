@@ -34,14 +34,14 @@ The Gradle app module consumes AAR files in `android/app/libs`. If the AAR is ab
 7. The service invokes `runXray`, maintains a foreground notification, and calls `stopXray` / resets DNS on shutdown or VPN revocation.
 
 ## Current limitations
-- The UI currently provides a VPN-permission preflight only. Server import, profile persistence, and a user-facing Connect/Disconnect workflow are not implemented.
-- The service expects a valid, complete Xray JSON profile in its start intent. It does not yet accept share links or subscription URLs.
+- The UI now accepts supported share-link text or Xray JSON, parses it locally, and exposes Connect/Disconnect controls. Encrypted profile persistence, QR scanning, and subscription URL fetching are not implemented.
+- The service expects a valid, complete Xray JSON profile in its start intent; the UI converts supported share links to that JSON before starting it. Subscription URL fetching and QR import remain future work.
 - IPv4 and IPv6 default routes are configured. IPv6 reachability, DNS leak behavior, socket protection, and traffic forwarding still require device-level tests.
-- The runtime adapter discovers gomobile-generated Java methods reflectively. CI must verify the generated class and method names against the pinned AAR; a successful Gradle compile alone does not prove runtime compatibility.
+- The runtime adapter discovers gomobile-generated Java methods reflectively. The generated class/method names and native callback behavior still need runtime verification; a successful Gradle compile alone does not prove compatibility.
 - The repository has not yet demonstrated a successful Android build, Xray startup, or real traffic tunnel. Do not describe the client as production-ready until those checks pass.
 - Do not load another independently built Go/cgo/gomobile runtime into this Android process. Upstream libXray documents that multiple Go runtimes in one process can cause build, load, or runtime failures.
 
 ## Safety behavior
 - The app does not establish a TUN interface without a supplied profile.
-- Missing native library, missing socket-protection API, missing DNS-protection API, invalid configuration, or failed core startup stops the service instead of reporting a connected state.
+- Missing native library, missing socket-protection API, missing DNS-protection API, invalid configuration, or failed core startup stops the service instead of reporting a connected state. On teardown, the socket callback is replaced with a detached fail-closed callback to avoid retaining the VPN Service.
 - VPN consent remains controlled by Android; the app cannot bypass the system dialog.
