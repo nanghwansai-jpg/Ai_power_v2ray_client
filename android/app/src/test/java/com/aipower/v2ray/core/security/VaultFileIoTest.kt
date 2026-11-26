@@ -32,7 +32,7 @@ class VaultFileIoTest {
     @Test
     fun rejectsStreamThatExceedsLimitAfterInitialFileCheck() {
         val stream = ByteArrayInputStream(ByteArray(33))
-        assertThrows(IllegalStateException::class.java) {
+        assertThrows(IllegalArgumentException::class.java) {
             readVaultStreamBounded(stream, 32L)
         }
     }
