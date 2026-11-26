@@ -39,6 +39,7 @@ The Gradle app module consumes AAR files in `android/app/libs`. If the AAR is ab
 - IPv4 and IPv6 default routes are configured. IPv6 reachability, DNS leak behavior, socket protection, and traffic forwarding still require device-level tests.
 - The runtime adapter discovers gomobile-generated Java methods reflectively. The generated class/method names and native callback behavior still need runtime verification; a successful Gradle compile alone does not prove compatibility.
 - The repository has not yet demonstrated a successful Android build, Xray startup, or real traffic tunnel. Do not describe the client as production-ready until those checks pass.
+- Do not call `testXray`, `pingBatch`, or create another Xray instance while `runXray` is active. Upstream documents process-wide Xray dialer/outbound state that can be replaced by temporary instances; node benchmarking must be serialized outside an active tunnel or isolated in another process.
 - Do not load another independently built Go/cgo/gomobile runtime into this Android process. Upstream libXray documents that multiple Go runtimes in one process can cause build, load, or runtime failures.
 
 ## Safety behavior
