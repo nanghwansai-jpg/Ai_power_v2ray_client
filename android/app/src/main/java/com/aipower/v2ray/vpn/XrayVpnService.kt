@@ -4,48 +4,70 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import android.content.pm.ServiceInfo
-import java.util.concurrent.Executors
 import com.aipower.v2ray.core.vpn.LibXrayRuntime
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 
 class XrayVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var runtime: LibXrayRuntime? = null
     private var coreStarted = false
+    private val destroyed = AtomicBoolean(false)
     private val worker = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP -> {
-                worker.execute {
-                    stopTunnel()
-                    stopSelf()
-                }
-                return START_NOT_STICKY
+            ACTION_STOP -> executeOnWorker(startId) {
+                stopTunnel()
+                stopSelf(startId)
             }
+
             ACTION_START -> {
                 startInForeground()
                 val rawConfig = intent.getStringExtra(EXTRA_XRAY_JSON)
-                if (rawConfig.isNullOrBlank()) {
-                    stopWithError("No Xray configuration was supplied")
+                if (rawConfig.isNullOrBlank() || rawConfig.length > MAX_CONFIG_CHARS) {
+                    executeOnWorker(startId) { stopWithError(startId) }
                     return START_NOT_STICKY
                 }
-                worker.execute {
+
+                executeOnWorker(startId) {
                     try {
                         stopTunnel(removeForeground = false)
                         startTunnel(rawConfig)
-                    } catch (error: Exception) {
-                        stopWithError(error.message ?: "Unable to start VPN")
+                    } catch (_: Exception) {
+                        stopWithError(startId)
                     }
                 }
             }
-            else -> stopSelf()
+
+            else -> executeOnWorker(startId) {
+                stopTunnel()
+                stopSelf(startId)
+            }
         }
         return START_NOT_STICKY
+    }
+
+    /**
+     * All tunnel mutations are serialized on one executor. Never wait for this
+     * executor from the main thread; service destruction queues final cleanup.
+     */
+    private fun executeOnWorker(startId: Int, block: () -> Unit) {
+        if (destroyed.get()) {
+            stopSelf(startId)
+            return
+        }
+        try {
+            worker.execute { block() }
+        } catch (_: RejectedExecutionException) {
+            stopSelf(startId)
+        }
     }
 
     @Synchronized
@@ -95,7 +117,7 @@ class XrayVpnService : VpnService() {
             runCatching { engine.invoke("stopXray") }
             runCatching { engine.resetDns() }
             runCatching { engine.clearSocketProtector() }
-            descriptor.close()
+            runCatching { descriptor.close() }
             tun = null
             runtime = null
             coreStarted = false
@@ -114,7 +136,7 @@ class XrayVpnService : VpnService() {
                 )
             )
         }
-        val notification = buildNotification("Starting secure VPN")
+        val notification = buildNotification("Starting secure VPN", ongoing = true)
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(
                 NOTIFICATION_ID,
@@ -128,10 +150,21 @@ class XrayVpnService : VpnService() {
 
     private fun updateNotification(message: String) {
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, buildNotification(message))
+            .notify(NOTIFICATION_ID, buildNotification(message, ongoing = true))
     }
 
-    private fun buildNotification(message: String): Notification {
+    private fun postFailureNotification() {
+        getSystemService(NotificationManager::class.java)
+            .notify(
+                NOTIFICATION_ID,
+                buildNotification(
+                    "VPN could not start. Check the profile and try again.",
+                    ongoing = false
+                )
+            )
+    }
+
+    private fun buildNotification(message: String, ongoing: Boolean): Notification {
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
@@ -142,15 +175,17 @@ class XrayVpnService : VpnService() {
             .setContentTitle("AI Power V2Ray Client")
             .setContentText(message)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setOngoing(true)
+            .setOngoing(ongoing)
+            .setAutoCancel(!ongoing)
             .build()
     }
 
-    private fun stopWithError(message: String) {
-        updateNotification("VPN stopped: $message")
+    private fun stopWithError(startId: Int) {
         stopTunnel()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        // Post a separate, non-ongoing notification after removing the FGS
+        // notification. Android may suppress it when notification permission is denied.
+        postFailureNotification()
+        stopSelf(startId)
     }
 
     @Synchronized
@@ -165,24 +200,30 @@ class XrayVpnService : VpnService() {
         runCatching { tun?.close() }
         tun = null
         if (removeForeground) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
-            }
+            stopForeground(STOP_FOREGROUND_REMOVE)
         }
     }
 
     override fun onRevoke() {
-        stopTunnel()
-        stopSelf()
+        executeOnWorker(startId = 0) {
+            stopTunnel()
+            stopSelf()
+        }
         super.onRevoke()
     }
 
     override fun onDestroy() {
-        worker.shutdownNow()
-        stopTunnel()
+        if (destroyed.compareAndSet(false, true)) {
+            // Queue cleanup behind any in-flight start/stop operation, then
+            // reject new work. Do not block Android's main thread waiting for native code.
+            try {
+                worker.execute { stopTunnel() }
+            } catch (_: RejectedExecutionException) {
+                // Best-effort fallback for an already-terminated executor.
+                stopTunnel()
+            }
+            worker.shutdown()
+        }
         super.onDestroy()
     }
 
@@ -192,5 +233,6 @@ class XrayVpnService : VpnService() {
         const val EXTRA_XRAY_JSON = "xray_json"
         private const val CHANNEL_ID = "vpn_connection"
         private const val NOTIFICATION_ID = 1001
+        private const val MAX_CONFIG_CHARS = 1_000_000
     }
 }
