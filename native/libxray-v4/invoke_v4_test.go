@@ -177,10 +177,17 @@ func TestInvokeV4RejectsTrailingAndExcessiveJSON(t *testing.T) {
 		}
 	}
 	fields := make([]string, maxV4ObjectFields+1)
-	for i := range fields { fields[i] = `"k` + strconv.Itoa(i) + `":0` }
-	tooManyFields := `{"apiVersion":4,"requestId":"` + testV4RequestID + `","method":"stopXray","payload":{}}`
-	_ = fields
-	_ = tooManyFields
+	for i := range fields {
+		fields[i] = `"f` + strconv.Itoa(i) + `":0`
+	}
+	tooManyFields := `{"apiVersion":4,"requestId":"` + testV4RequestID + `","method":"stopXray","payload":{` + strings.Join(fields, ",") + `}}`
+	var response decodedV4Response
+	if err := json.Unmarshal([]byte(InvokeV4(tooManyFields)), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Success || response.Code != "INVALID_REQUEST" {
+		t.Fatalf("oversized object accepted: %+v", response)
+	}
 }
 
 func TestInvokeV4ConcurrentStopCallsAreSerialized(t *testing.T) {
