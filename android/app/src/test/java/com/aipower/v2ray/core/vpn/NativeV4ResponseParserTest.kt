@@ -151,4 +151,32 @@ class NativeV4ResponseParserTest {
             // Expected: malformed, oversized, or inconsistent response.
         }
     }
+
+    @Test fun testOnlyFaultInjectionCoversMalformedNativeResponses() {
+        val valid = response()
+        assertTrue(NativeV4FaultInjection.RELEASE_EXCLUSION_SENTINEL.isNotBlank())
+
+        listOf(
+            NativeV4FaultInjection.duplicateEnvelopeKey(valid),
+            NativeV4FaultInjection.wrongApiVersion(valid),
+            NativeV4FaultInjection.wrongMethod(valid),
+            NativeV4FaultInjection.oversizedControlResponse(valid),
+            NativeV4FaultInjection.deeplyNestedResponse(valid),
+            NativeV4FaultInjection.malformedUnicode(valid),
+            NativeV4FaultInjection.contradictorySuccessEnvelope(valid)
+        ).forEach { malformed ->
+            expectFailure { NativeV4ResponseParser.parse(malformed, id, "testXray") }
+        }
+    }
+
+    @Test fun acceptsPartialCorrelationOnlyOnInvalidRequestAndStillFailsClosed() {
+        val partial = """{"apiVersion":4,"requestId":null,"method":"testXray","success":false,"code":"INVALID_REQUEST","data":null,"error":{"category":"PROTOCOL","retryable":false}}"""
+        try {
+            NativeV4ResponseParser.parse(partial, id, "testXray")
+            fail("Expected structured INVALID_REQUEST")
+        } catch (e: NativeV4Exception) {
+            assertEquals(NativeV4ErrorCode.INVALID_REQUEST, e.code)
+        }
+    }
+
 }
