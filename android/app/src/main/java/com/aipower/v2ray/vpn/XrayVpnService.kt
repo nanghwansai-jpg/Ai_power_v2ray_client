@@ -94,7 +94,7 @@ class XrayVpnService : VpnService() {
         } catch (error: Exception) {
             runCatching { engine.invoke("stopXray") }
             runCatching { engine.resetDns() }
-            runCatching { engine.unregisterSocketProtector() }
+            runCatching { engine.clearSocketProtector() }
             descriptor.close()
             tun = null
             runtime = null
@@ -159,7 +159,7 @@ class XrayVpnService : VpnService() {
             runCatching { runtime?.invoke("stopXray") }
         }
         runCatching { runtime?.resetDns() }
-        runCatching { runtime?.unregisterSocketProtector() }
+        runCatching { runtime?.clearSocketProtector() }
         coreStarted = false
         runtime = null
         runCatching { tun?.close() }
