@@ -1,5 +1,6 @@
 package com.aipower.v2ray.core.security
 
+import java.io.ByteArrayInputStream
 import java.io.File
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertThrows
@@ -29,11 +30,10 @@ class VaultFileIoTest {
     }
 
     @Test
-    fun rejectsFileThatGrowsAfterInitialLengthCheck() {
-        val file = temporaryFolder.newFile("vault.bin").apply { writeBytes(ByteArray(8)) }
-        // Exercise the bounded reader with a stricter cap than the current file size.
-        assertThrows(IllegalArgumentException::class.java) {
-            readVaultBounded(file, 7L)
+    fun rejectsStreamThatExceedsLimitAfterInitialFileCheck() {
+        val stream = ByteArrayInputStream(ByteArray(33))
+        assertThrows(IllegalStateException::class.java) {
+            readVaultStreamBounded(stream, 32L)
         }
     }
 }
