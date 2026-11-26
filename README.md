@@ -7,7 +7,7 @@ Android VPN client project using Kotlin, Jetpack Compose, and a modular Xray int
 - Android application foundation and VPN permission preflight added.
 - Android VPNService lifecycle and a pinned XTLS/libXray v26.11.9 runtime adapter added.
 - CI is configured to build the native libXray AAR before the Android app.
-- Server import, profile persistence, user-facing connect/disconnect, verified TUN traffic forwarding, Cloudflare backend, and device-level leak tests are not complete.
+- Basic local share-link/Xray JSON import and Connect/Disconnect controls are added. Encrypted profile persistence, QR/subscription import, verified TUN traffic forwarding, Cloudflare backend, and device-level leak tests are not complete.
 
 ## Requirements
 - Android Studio with a compatible JDK.
