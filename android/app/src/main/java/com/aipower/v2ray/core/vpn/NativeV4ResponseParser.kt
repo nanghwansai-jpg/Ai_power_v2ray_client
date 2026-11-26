@@ -42,8 +42,16 @@ internal object NativeV4ResponseParser {
         val requestId = nullableString(root["requestId"])
         val method = nullableString(root["method"])
 
-        // Native cannot correlate malformed JSON or a missing/invalid request ID.
-        if (!success && codeText == "INVALID_REQUEST" && requestId == null && method == null) {
+        // INVALID_REQUEST may retain either independently validated correlation field.
+        // Native extracts a valid UUID and a valid ASCII method before validating the
+        // complete request envelope, so either field can legitimately be null.
+        if (!success && codeText == "INVALID_REQUEST") {
+            require(requestId == null || requestId == expectedRequestId) {
+                "Native V4 request ID mismatch"
+            }
+            require(method == null || method == expectedMethod) {
+                "Native V4 method mismatch"
+            }
             require(root["data"] === Null) { "Invalid failure data" }
             val e = validateError(root["error"])
             throw NativeV4Exception(NativeV4ErrorCode.INVALID_REQUEST, e.first, e.second)
