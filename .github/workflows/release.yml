@@ -111,7 +111,7 @@ jobs:
           set -euo pipefail
           APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
           test -n "$APK"
-          if unzip -Z1 "$APK" | grep -E '^classes[0-9]*\.dex$' | while read -r dex; do unzip -p "$APK" "$dex"; done | strings | grep -Fq 'AI_POWER_V4_FAULT_INJECTION_TEST_ONLY'; then
+          if unzip -Z1 "$APK" | grep -E '^classes[0-9]*\.dex$' | while read -r dex; do unzip -p "$APK" "$dex"; done | strings | grep -F 'AI_POWER_V4_FAULT_INJECTION_TEST_ONLY' >/dev/null; then
             echo "::error::Test-only native V4 fault injection marker found in release APK"
             exit 1
           fi
