@@ -42,7 +42,7 @@ jobs:
       - name: Set up Go from pinned libXray module
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.x"
+          go-version: "1.27.3"
           cache: false
 
       - name: Set up Python
@@ -71,3 +71,11 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload native V4 build provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: libxray-v4-build-provenance
+          path: ${{ runner.temp }}/libXray/native-v4-build.txt
+          if-no-files-found: error
+          retention-days: 90
