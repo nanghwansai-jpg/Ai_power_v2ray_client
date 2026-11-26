@@ -21,7 +21,7 @@ concurrency:
 jobs:
   release:
     name: Build, sign, and publish Android release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout release source
         uses: actions/checkout@v4
@@ -53,8 +53,8 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK platform and build tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Install Android NDK
         run: |
