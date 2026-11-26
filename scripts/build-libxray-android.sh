@@ -27,6 +27,7 @@ fi
 # and tests are overlaid as separate same-package Go files.
 install -m 0644 "$OVERLAY_DIR/invoke_v4.go" "$WORK_DIR/invoke_v4.go"
 install -m 0644 "$OVERLAY_DIR/invoke_v4_test.go" "$WORK_DIR/invoke_v4_test.go"
+gofmt -w "$WORK_DIR/invoke_v4.go" "$WORK_DIR/invoke_v4_test.go"
 
 (
   cd "$WORK_DIR"
@@ -63,6 +64,7 @@ mkdir -p "$WORK_DIR/provenance"
   echo "native_overlay_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4.go" | awk '{print $1}')"
   echo "native_tests_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4_test.go" | awk '{print $1}')"
   echo "native_patch_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4.go" "$OVERLAY_DIR/invoke_v4_test.go" | sha256sum | awk '{print $1}')"
+  echo "compiled_overlay_sha256=$(sha256sum "$WORK_DIR/invoke_v4.go" "$WORK_DIR/invoke_v4_test.go" | sha256sum | awk '{print $1}')"
   echo "patched_source_tree_identity=${ACTUAL_COMMIT}+${OVERLAY_TREE_HASH}"
   echo "aar_sha256=$(sha256sum "$WORK_DIR/libXray.aar" | awk '{print $1}')"
   echo "go_version=$(go version)"
