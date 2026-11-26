@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import com.aipower.v2ray.core.agent.AgentLocalStore
 import com.aipower.v2ray.core.vpn.LibXrayRuntime
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -47,7 +48,8 @@ class XrayVpnService : VpnService() {
                     try {
                         stopTunnel(removeForeground = false)
                         startTunnel(rawConfig)
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
+                        AgentLocalStore(this).log("ERROR", "XRAY_CORE", "Core start failed: ${error.javaClass.simpleName}")
                         stopWithError(startId)
                     }
                 }
@@ -118,6 +120,7 @@ class XrayVpnService : VpnService() {
             engine.runXrayV4(config.toString())
             runtime = engine
             coreStarted = true
+            AgentLocalStore(this).log("INFO", "XRAY_CORE", "Xray core start completed")
             updateNotification("VPN connected")
         } catch (error: Exception) {
             runCatching { engine.stopXrayV4() }
@@ -188,6 +191,7 @@ class XrayVpnService : VpnService() {
     }
 
     private fun stopWithError(startId: Int) {
+        AgentLocalStore(this).log("ERROR", "VPN_SERVICE", "VPN startup failed; tunnel cleanup requested")
         stopTunnel(removeForeground = false)
         synchronized(foregroundLock) {
             // An older start failure must not remove the foreground notification
@@ -220,6 +224,7 @@ class XrayVpnService : VpnService() {
     @Synchronized
     private fun stopTunnel(removeForeground: Boolean = true) {
         if (coreStarted) {
+            AgentLocalStore(this).log("INFO", "XRAY_CORE", "Xray core stop requested")
             runCatching { runtime?.stopXrayV4() }
         }
         runCatching { runtime?.resetDns() }

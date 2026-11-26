@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
             var autoReconnect by remember { mutableStateOf(store.setting("auto_reconnect", "true") == "true") }
             var offlineMode by remember { mutableStateOf(store.setting("offline_mode", "true") == "true") }
             var startupAssistant by remember { mutableStateOf(store.setting("startup_assistant", "true") == "true") }
+            var showStartupGoal by remember { mutableStateOf(store.setting("startup_goal_done", "false") != "true" && store.setting("startup_assistant", "true") == "true") }
             var dnsMode by remember { mutableStateOf(store.setting("dns_mode", "Cloudflare (1.1.1.1)") ) }
             var routingMode by remember { mutableStateOf(store.setting("routing_mode", "Global VPN")) }
             var benchmarkLimit by remember { mutableStateOf(store.setting("benchmark_limit", "50")) }
@@ -190,6 +191,28 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
+            if (showStartupGoal) {
+                AlertDialog(
+                    onDismissRequest = { showStartupGoal = false },
+                    title = { Text("What will you use your VPN for?") },
+                    text = { Text("Choose a goal. The local agent saves this preference and can use it when ranking verified profiles. It will not invent working servers.") },
+                    confirmButton = {
+                        Column {
+                            listOf("General browsing", "Social media", "Video streaming", "Gaming · low latency", "Work · private access").forEach { goal ->
+                                TextButton(onClick = {
+                                    store.putSetting("startup_goal", goal)
+                                    store.putSetting("startup_goal_done", "true")
+                                    store.log("INFO", "AGENT", "Startup usage goal saved: $goal")
+                                    logs = store.logs()
+                                    status = "Usage goal saved: $goal"
+                                    showStartupGoal = false
+                                }) { Text(goal) }
+                            }
+                        }
+                    },
+                    dismissButton = { TextButton(onClick = { store.putSetting("startup_goal_done", "true"); showStartupGoal = false }) { Text("Skip") } }
+                )
             }
             if (showDelete) {
                 AlertDialog(onDismissRequest = { showDelete = false }, title = { Text("Delete saved profile?") },

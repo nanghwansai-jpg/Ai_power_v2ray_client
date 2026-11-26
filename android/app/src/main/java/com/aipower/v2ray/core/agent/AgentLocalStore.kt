@@ -86,6 +86,6 @@ class AgentLocalStore(context: Context) {
         private const val MAX_LOGS = 500
         private const val KEY_ALIAS = "ai_power_gemini_settings_v1"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
-        private val ALLOWED_SETTINGS = setOf("auto_reconnect", "offline_mode", "startup_assistant", "dns_mode", "routing_mode", "benchmark_limit")
+        private val ALLOWED_SETTINGS = setOf("auto_reconnect", "offline_mode", "startup_assistant", "dns_mode", "routing_mode", "benchmark_limit", "startup_goal", "startup_goal_done")
     }
 }
