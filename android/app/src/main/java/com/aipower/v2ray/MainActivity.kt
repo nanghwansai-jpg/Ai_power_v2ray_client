@@ -3,6 +3,7 @@ package com.aipower.v2ray
 import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -18,8 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,22 +31,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.aipower.v2ray.core.vpn.ImportedXrayProfile
+import com.aipower.v2ray.core.vpn.XrayProfileParser
+import com.aipower.v2ray.vpn.XrayVpnService
 
 class MainActivity : ComponentActivity() {
+    private var pendingConfig: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var permissionStatus by remember {
-                mutableStateOf("VPN permission has not been checked")
-            }
+            var inputText by remember { mutableStateOf("") }
+            var profile by remember { mutableStateOf<ImportedXrayProfile?>(null) }
+            var status by remember { mutableStateOf("Paste a supported V2Ray/Xray link or JSON profile.") }
+            var busy by remember { mutableStateOf(false) }
 
             val permissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult()
             ) { result ->
-                permissionStatus = if (result.resultCode == Activity.RESULT_OK) {
-                    "VPN permission granted. A server profile is still required."
+                val config = pendingConfig
+                pendingConfig = null
+                if (result.resultCode == Activity.RESULT_OK && config != null) {
+                    startVpn(config)
+                    status = "VPN start requested. Check the persistent notification for connection status."
                 } else {
-                    "VPN permission was not granted."
+                    status = "VPN permission was not granted."
                 }
             }
 
@@ -52,55 +64,130 @@ class MainActivity : ComponentActivity() {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(24.dp),
+                            .padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        verticalArrangement = Arrangement.Top
                     ) {
                         Text(
                             text = "AI Power V2Ray Client",
                             style = MaterialTheme.typography.headlineSmall
                         )
-                        Spacer(Modifier.height(12.dp))
-                        Text("Xray Core integration foundation")
-                        Spacer(Modifier.height(20.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text("Xray Core • libXray v26.11.9")
+                        Spacer(Modifier.height(16.dp))
+
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text("VPN engine")
-                                Text("Android VpnService + XTLS/libXray adapter")
-                                Spacer(Modifier.height(8.dp))
-                                Text("Engine version: libXray v26.11.9")
-                                Spacer(Modifier.height(8.dp))
-                                Text("Connection: Not connected")
+                                Text("Android VpnService + XTLS/libXray")
+                                Text("State: service lifecycle integrated")
                             }
                         }
-                        Spacer(Modifier.height(20.dp))
+
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = "Import server profile",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextField(
+                            value = inputText,
+                            onValueChange = {
+                                inputText = it
+                                profile = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 4,
+                            maxLines = 7,
+                            placeholder = {
+                                Text("vless://, vmess://, trojan://, ss://, socks://, or Xray JSON")
+                            }
+                        )
+                        Spacer(Modifier.height(10.dp))
                         Button(
                             onClick = {
-                                val prepareIntent = VpnService.prepare(this@MainActivity)
-                                if (prepareIntent == null) {
-                                    permissionStatus =
-                                        "VPN permission already granted. A server profile is still required."
-                                } else {
-                                    permissionLauncher.launch(prepareIntent)
-                                }
-                            }
+                                busy = true
+                                profile = null
+                                status = "Parsing and validating profile locally..."
+                                val raw = inputText
+                                Thread {
+                                    try {
+                                        val imported = XrayProfileParser().parse(raw)
+                                        runOnUiThread {
+                                            profile = imported
+                                            busy = false
+                                            status = "Imported ${imported.displayName} • ${imported.outboundCount} outbound(s)"
+                                        }
+                                    } catch (error: Exception) {
+                                        runOnUiThread {
+                                            busy = false
+                                            status = error.message ?: "Profile import failed."
+                                        }
+                                    }
+                                }.start()
+                            },
+                            enabled = inputText.isNotBlank() && !busy,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Check VPN permission")
+                            Text(if (busy) "Validating..." else "Import and validate")
                         }
+
+                        profile?.let { imported ->
+                            Spacer(Modifier.height(8.dp))
+                            Text("Selected: ${imported.displayName}")
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    val prepareIntent = VpnService.prepare(this@MainActivity)
+                                    if (prepareIntent == null) {
+                                        startVpn(imported.configJson)
+                                        status = "VPN start requested. Check the persistent notification."
+                                    } else {
+                                        pendingConfig = imported.configJson
+                                        permissionLauncher.launch(prepareIntent)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Connect")
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                startService(
+                                    Intent(this@MainActivity, XrayVpnService::class.java)
+                                        .setAction(XrayVpnService.ACTION_STOP)
+                                )
+                                status = "VPN stop requested."
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Disconnect")
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+                        Text(status, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = permissionStatus,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(Modifier.height(20.dp))
-                        Text(
-                            text = "Import and validate a server profile before connecting. " +
-                                "The app will not create a tunnel without a valid Xray configuration.",
+                            text = "Profiles are parsed locally. Subscription URL fetching, encrypted profile storage, QR scanning, and live tunnel diagnostics are next-stage work.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
             }
+        }
+    }
+
+    private fun startVpn(configJson: String) {
+        val intent = Intent(this, XrayVpnService::class.java)
+            .setAction(XrayVpnService.ACTION_START)
+            .putExtra(XrayVpnService.EXTRA_XRAY_JSON, configJson)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
         }
     }
 }
