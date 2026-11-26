@@ -122,8 +122,15 @@ func InvokeV4(requestJSON string) (response string) {
 
 	data, callErr := executeV4Method(*method, payload)
 	if callErr != nil {
-		code, category := v4MethodError(*method)
-		return encodeV4Failure(requestID, method, code, category, false)
+		switch {
+		case errors.Is(callErr, share.ErrV4ShareInputTooLarge):
+			return encodeV4Failure(requestID, method, "REQUEST_TOO_LARGE", "LIMIT", false)
+		case errors.Is(callErr, share.ErrV4ShareOutputTooLarge):
+			return encodeV4Failure(requestID, method, "RESPONSE_TOO_LARGE", "LIMIT", false)
+		default:
+			code, category := v4MethodError(*method)
+			return encodeV4Failure(requestID, method, code, category, false)
+		}
 	}
 	budget := maxV4ControlBytes
 	if *method == string(LibXrayMethodConvertShareLinksToXrayJson) {
