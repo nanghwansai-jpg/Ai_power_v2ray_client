@@ -190,6 +190,16 @@ func TestInvokeV4RejectsTrailingAndExcessiveJSON(t *testing.T) {
 	}
 }
 
+
+func TestInvokeV4MethodSpecificRequestLimit(t *testing.T) {
+	payload, err := json.Marshal(map[string]string{"text": strings.Repeat("x", maxV4ProfileBytes+1)})
+	if err != nil { t.Fatal(err) }
+	response := callV4ForTest(t, "convertShareLinksToXrayJson", string(payload))
+	if response.Success || response.Code != "REQUEST_TOO_LARGE" || response.RequestID == nil || *response.RequestID != testV4RequestID {
+		t.Fatalf("method-specific oversized request was not correlated/rejected: %+v", response)
+	}
+}
+
 func TestInvokeV4ConcurrentStopCallsAreSerialized(t *testing.T) {
 	const calls = 8
 	var wait sync.WaitGroup
