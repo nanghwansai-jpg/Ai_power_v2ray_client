@@ -74,8 +74,7 @@ class NativeV4ResponseParserTest {
     @Test fun acceptsNullCorrelationOnlyForInvalidRequest() {
         try {
             NativeV4ResponseParser.parse(
-                response(success = false, code = "INVALID_REQUEST", requestId = "null", method = "null", data = "null",
-                    error = """{"category":"PROTOCOL","retryable":false}"""),
+                """{"apiVersion":4,"requestId":null,"method":null,"success":false,"code":"INVALID_REQUEST","data":null,"error":{"category":"PROTOCOL","retryable":false}}""",
                 id,
                 "testXray"
             )
