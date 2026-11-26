@@ -1,6 +1,7 @@
 package com.aipower.v2ray
 
 import android.app.Activity
+import android.content.ClipboardManager
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
@@ -107,6 +108,28 @@ class MainActivity : ComponentActivity() {
                                 Text("VLESS, VMess AEAD, Trojan, Shadowsocks, SOCKS, Hysteria2, or Xray JSON")
                             }
                         )
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val clipboard = getSystemService(ClipboardManager::class.java)
+                                val clip = clipboard?.primaryClip
+                                val pasted = if (clip != null && clip.itemCount > 0) {
+                                    clip.getItemAt(0).coerceToText(this@MainActivity).toString()
+                                } else {
+                                    ""
+                                }
+                                if (pasted.isBlank()) {
+                                    status = "Clipboard is empty or does not contain text."
+                                } else {
+                                    inputText = pasted
+                                    profile = null
+                                    status = "Text pasted from clipboard. Tap Import and validate."
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Paste from clipboard")
+                        }
                         Spacer(Modifier.height(10.dp))
                         Button(
                             onClick = {
