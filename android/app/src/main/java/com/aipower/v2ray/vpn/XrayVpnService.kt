@@ -48,6 +48,11 @@ class XrayVpnService : VpnService() {
         }
 
         val config = JSONObject(rawConfig)
+        engine.invoke("testXray", JSONObject().put("xrayJson", config.toString()))
+        check(engine.configureDns("1.1.1.1:53")) {
+            "libXray Android DNS protection API is unavailable"
+        }
+
         val env = config.optJSONObject("env") ?: JSONObject().also {
             config.put("env", it)
         }
@@ -80,6 +85,7 @@ class XrayVpnService : VpnService() {
             coreStarted = true
             updateNotification("VPN connected")
         } catch (error: Exception) {
+            runCatching { engine.resetDns() }
             descriptor.close()
             tun = null
             throw error
@@ -140,6 +146,7 @@ class XrayVpnService : VpnService() {
         if (coreStarted) {
             runCatching { runtime?.invoke("stopXray") }
         }
+        runCatching { runtime?.resetDns() }
         coreStarted = false
         runtime = null
         runCatching { tun?.close() }
