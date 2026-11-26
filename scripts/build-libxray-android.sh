@@ -51,6 +51,7 @@ fi
 
 mkdir -p "$APP_LIBS_DIR"
 install -m 0644 "$WORK_DIR/libXray.aar" "$APP_LIBS_DIR/libXray.aar"
+OVERLAY_TREE_HASH="$(sha256sum "$OVERLAY_DIR/invoke_v4.go" "$OVERLAY_DIR/invoke_v4_test.go" | sha256sum | awk '{print $1}')"
 mkdir -p "$WORK_DIR/provenance"
 {
   echo "upstream_repository=https://github.com/XTLS/libXray"
@@ -62,7 +63,7 @@ mkdir -p "$WORK_DIR/provenance"
   echo "native_overlay_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4.go" | awk '{print $1}')"
   echo "native_tests_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4_test.go" | awk '{print $1}')"
   echo "native_patch_sha256=$(sha256sum "$OVERLAY_DIR/invoke_v4.go" "$OVERLAY_DIR/invoke_v4_test.go" | sha256sum | awk '{print $1}')"
-  echo "patched_source_tree_identity=$(git -C "$WORK_DIR" rev-parse HEAD")+$(sha256sum "$OVERLAY_DIR/invoke_v4.go" "$OVERLAY_DIR/invoke_v4_test.go" | sha256sum | awk '{print $1}')"
+  echo "patched_source_tree_identity=${ACTUAL_COMMIT}+${OVERLAY_TREE_HASH}"
   echo "aar_sha256=$(sha256sum "$WORK_DIR/libXray.aar" | awk '{print $1}')"
   echo "go_version=$(go version)"
   echo "python_version=$(python3 --version)"
