@@ -63,6 +63,45 @@ jobs:
 
       - name: Run unit tests and build debug APK
         run: gradle :android:app:testDebugUnitTest :android:app:assembleDebug
+ 
+      - name: Build release variant and inspect DEX for test-only fault injection
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/ci-release-inspection.keystore" \
+            -storepass ci-inspection-store-password \
+            -keypass ci-inspection-key-password \
+            -alias ci-inspection \
+            -dname "CN=CI Release Inspection" \
+            -keyalg RSA -keysize 2048 -validity 2
+          ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/ci-release-inspection.keystore" \
+          ANDROID_KEYSTORE_PASSWORD="ci-inspection-store-password" \
+          ANDROID_KEY_ALIAS="ci-inspection" \
+          ANDROID_KEY_PASSWORD="ci-inspection-key-password" \
+            gradle :android:app:assembleRelease
+          APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
+          test -n "$APK"
+          if unzip -Z1 "$APK" | grep -E '^classes[0-9]*\\.dex
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-power-v2ray-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload native V4 build provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: libxray-v4-build-provenance
+          path: ${{ runner.temp }}/libXray/native-v4-build.txt
+          if-no-files-found: error
+          retention-days: 90
+ | while read -r dex; do unzip -p "$APK" "$dex"; done | strings | grep -F 'AI_POWER_V4_FAULT_INJECTION_TEST_ONLY' >/dev/null; then
+            echo "::error::Test-only native V4 fault injection marker found in release APK"
+            exit 1
+          fi
+          echo "Verified: test-only fault injection code is absent from release APK DEX."
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
