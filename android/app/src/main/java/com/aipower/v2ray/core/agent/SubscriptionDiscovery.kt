@@ -1,6 +1,7 @@
 package com.aipower.v2ray.core.agent
 
 import android.util.Base64
+import android.net.Network
 import com.aipower.v2ray.core.vpn.ImportedXrayProfile
 import com.aipower.v2ray.core.vpn.XrayProfileParser
 import org.json.JSONObject
@@ -28,6 +29,7 @@ data class ServerCandidate(
  * handshake, throughput, censorship circumvention, or Internet access.
  */
 class SubscriptionDiscovery(
+    private val underlyingNetwork: Network,
     private val parser: XrayProfileParser = XrayProfileParser()
 ) {
     fun discoverAndBenchmark(subscriptionUrl: String, limit: Int = 50): List<ServerCandidate> {
@@ -138,7 +140,7 @@ class SubscriptionDiscovery(
                 ?: outbound.optInt("port", 0).takeIf { it > 0 }
                 ?: continue
             if (host.length > 253 || host.any { it.isWhitespace() || it == '/' || it == '@' }) continue
-            val address = runCatching { InetAddress.getAllByName(host).firstOrNull { isPublicAddress(it) } }.getOrNull()
+            val address = runCatching { underlyingNetwork.getAllByName(host).firstOrNull { isPublicAddress(it) } }.getOrNull()
                 ?: continue
             return address.hostAddress to port
         }
@@ -149,6 +151,7 @@ class SubscriptionDiscovery(
         return try {
             val start = System.nanoTime()
             Socket().use { socket ->
+                underlyingNetwork.bindSocket(socket)
                 socket.connect(InetSocketAddress(candidate.host, candidate.port), CONNECT_TIMEOUT_MS)
             }
             candidate.copy(latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start))

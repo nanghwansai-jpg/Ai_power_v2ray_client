@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.ClipboardManager
 import android.content.Intent
 import android.net.VpnService
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -308,7 +310,15 @@ private fun ServersScreen(
                 message = "Fetching subscription and benchmarking up to $limit endpoints…"
                 Thread {
                     val outcome = runCatching {
-                        SubscriptionDiscovery().discoverAndBenchmark(subscriptionUrl, limit.toIntOrNull()?.coerceIn(1, 50) ?: 50)
+                        run {
+                            val connectivity = getSystemService(ConnectivityManager::class.java)
+                            val physicalNetwork = connectivity.allNetworks.firstOrNull { network ->
+                                val caps = connectivity.getNetworkCapabilities(network)
+                                caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                                    (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR))
+                            } ?: error("No underlying Wi-Fi or cellular network is available for safe direct benchmarking.")
+                            SubscriptionDiscovery(physicalNetwork).discoverAndBenchmark(subscriptionUrl, limit.toIntOrNull()?.coerceIn(1, 50) ?: 50)
+                        }
                     }
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         busy = false
