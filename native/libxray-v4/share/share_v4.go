@@ -12,6 +12,11 @@ import (
 	"github.com/xtls/xray-core/infra/conf"
 )
 
+var (
+	ErrV4ShareInputTooLarge = errors.New("profile input exceeds supported size")
+	ErrV4ShareOutputTooLarge = errors.New("profile output exceeds supported size")
+)
+
 const (
 	maxV4ShareInputBytes = 2 * 1024 * 1024
 	maxV4ShareOutputBytes = 2 * 1024 * 1024
@@ -35,7 +40,7 @@ func ConvertShareLinksToXrayJsonV4(links, secretKey string) (json.RawMessage, er
 		return nil, err
 	}
 	if len(text) > maxV4ShareInputBytes {
-		return nil, errors.New("profile input exceeds supported size")
+		return nil, ErrV4ShareInputTooLarge
 	}
 	config, err := parseShareCandidates(text, true)
 	if err != nil {
@@ -46,6 +51,9 @@ func ConvertShareLinksToXrayJsonV4(links, secretKey string) (json.RawMessage, er
 	}
 	config, err = filterBuildableOutboundsV4(config)
 	if err != nil {
+		if errors.Is(err, ErrV4ShareOutputTooLarge) {
+			return nil, err
+		}
 		if encrypted {
 			return nil, ErrAgePlaintextUnsupported
 		}
@@ -53,6 +61,9 @@ func ConvertShareLinksToXrayJsonV4(links, secretKey string) (json.RawMessage, er
 	}
 	raw, err := marshalShareConfigJSONV4(config)
 	if err != nil {
+		if errors.Is(err, ErrV4ShareOutputTooLarge) {
+			return nil, err
+		}
 		if encrypted {
 			return nil, ErrAgePlaintextUnsupported
 		}
@@ -63,7 +74,7 @@ func ConvertShareLinksToXrayJsonV4(links, secretKey string) (json.RawMessage, er
 
 func decryptShareTextV4(links, secretKey string) (string, bool, error) {
 	if len(links) > maxV4ShareInputBytes {
-		return "", false, errors.New("profile input exceeds supported size")
+		return "", false, ErrV4ShareInputTooLarge
 	}
 	text := strings.TrimSpace(FixWindowsReturn(links))
 	if !strings.HasPrefix(text, ageArmorHeader) {
@@ -89,17 +100,17 @@ func decryptShareTextV4(links, secretKey string) (string, bool, error) {
 		return "", true, ErrAgeArmorMalformed
 	}
 	if len(plaintext) > maxV4ShareInputBytes {
-		return "", true, errors.New("decrypted profile exceeds supported size")
+		return "", true, ErrV4ShareInputTooLarge
 	}
 	return string(plaintext), true, nil
 }
 
 func filterBuildableOutboundsV4(config *conf.Config) (*conf.Config, error) {
 	if config == nil || len(config.OutboundConfigs) == 0 || len(config.OutboundConfigs) > maxV4ShareOutbounds {
-		return nil, errors.New("outbound count limit")
+		return nil, ErrV4ShareOutputTooLarge
 	}
 	if estimateShareJSONSize(reflect.ValueOf(config.OutboundConfigs), maxV4ShareOutputBytes+1) > maxV4ShareOutputBytes {
-		return nil, errors.New("profile output exceeds supported size")
+		return nil, ErrV4ShareOutputTooLarge
 	}
 	raw, err := json.Marshal(config.OutboundConfigs)
 	if err != nil || len(raw) > maxV4ShareOutputBytes {
