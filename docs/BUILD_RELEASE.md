@@ -39,7 +39,10 @@ git push origin v0.1.0
 The workflow then builds and publishes the release. A manual run requires the name of an existing tag.
 
 ## Current limitations
-- This repository does not yet contain the Xray Core binaries or integration, a working VPNService data plane, protocol importers, or Cloudflare Worker implementation.
+- The pinned libXray integration and basic VPNService lifecycle are present, but the full end-to-end TUN forwarding path has not been verified on a physical Android device.
+- Profile import currently covers the native libXray conversion path; QR scanning, subscription URL management, and multi-profile Room management are not implemented.
+- A local single-profile vault is implemented with AES-256-GCM and an Android Keystore key. This is not yet a complete multi-profile repository or backup/restore system.
+- Cloudflare Worker services and AI Gateway are not implemented yet.
 - Release workflow execution and APK/AAB output have not yet been verified. The workflow will stop if signing secrets are missing.
 - No production-ready app should be distributed until VPN functionality, security, and device compatibility tests pass.
 
