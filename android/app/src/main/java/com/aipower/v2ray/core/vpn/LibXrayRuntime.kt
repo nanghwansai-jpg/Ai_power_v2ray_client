@@ -112,7 +112,7 @@ internal class LibXrayRuntime(
         } ?: error("libXray Invoke(String) entry point was not found")
 
         val request = JSONObject()
-            .put("apiVersion", 2)
+            .put("apiVersion", LIBXRAY_API_VERSION)
             .put("method", method)
             .put("payload", JSONObject(payloadText))
             .toString()
@@ -146,6 +146,8 @@ internal class LibXrayRuntime(
     }
 
     companion object {
+        // Must match LibXrayAPIVersion in the pinned XTLS/libXray v26.11.9 source.
+        private const val LIBXRAY_API_VERSION = 3
         private val ALLOWED_METHODS = setOf(
             "convertShareLinksToXrayJson",
             "testXray",
