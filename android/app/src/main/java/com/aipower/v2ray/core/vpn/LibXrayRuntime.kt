@@ -135,7 +135,8 @@ internal class LibXrayRuntime(
      * App-owned V4 entry point. This is intentionally additive: invoke() above
      * remains the unchanged V3 compatibility path until service migration gates pass.
      */
-    fun invokeV4(method: String, payload: JSONObject = JSONObject()): NativeV4Result {
+    /** Private V4 transport: request envelope -> native binding -> strict typed response. */
+    private fun invokeV4(method: String, payload: JSONObject = JSONObject()): NativeV4Result {
         require(method in V4_ALLOWED_METHODS) { "Unsupported libXray V4 operation" }
         val payloadText = payload.toString()
         val payloadBytes = payloadText.toByteArray(Charsets.UTF_8).size
