@@ -2,8 +2,13 @@ package com.aipower.v2ray.core.security
 
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -36,4 +41,94 @@ class VaultFileIoTest {
             readVaultStreamBounded(stream, 32L)
         }
     }
+    @Test
+    fun restoresBackupWhenPrimaryIsAnIncompleteNonAtomicReplacement() {
+        val primary = temporaryFolder.newFile("profiles.vault").apply {
+            writeText("partial-new-ciphertext")
+        }
+        val backup = temporaryFolder.newFile("profiles.vault.bak").apply {
+            writeText("last-known-good-ciphertext")
+        }
+
+        recoverVaultReplacement(
+            primary,
+            backup,
+            isPrimaryValid = { it.readText() == "authenticated-new-ciphertext" },
+            moveFile = ::moveForTest,
+            syncDirectory = {}
+        )
+
+        assertEquals("last-known-good-ciphertext", primary.readText())
+        assertFalse(backup.exists())
+    }
+
+    @Test
+    fun keepsAuthenticatedPrimaryAndRemovesStaleBackup() {
+        val primary = temporaryFolder.newFile("profiles.vault").apply {
+            writeText("authenticated-new-ciphertext")
+        }
+        val backup = temporaryFolder.newFile("profiles.vault.bak").apply {
+            writeText("old-ciphertext")
+        }
+
+        recoverVaultReplacement(
+            primary,
+            backup,
+            isPrimaryValid = { it.readText() == "authenticated-new-ciphertext" },
+            moveFile = ::moveForTest,
+            syncDirectory = {}
+        )
+
+        assertEquals("authenticated-new-ciphertext", primary.readText())
+        assertFalse(backup.exists())
+    }
+
+    @Test
+    fun restoresBackupWhenPrimaryIsMissing() {
+        val primary = File(temporaryFolder.root, "profiles.vault")
+        val backup = temporaryFolder.newFile("profiles.vault.bak").apply {
+            writeText("last-known-good-ciphertext")
+        }
+
+        recoverVaultReplacement(
+            primary,
+            backup,
+            isPrimaryValid = { error("Validator must not run without a primary") },
+            moveFile = ::moveForTest,
+            syncDirectory = {}
+        )
+
+        assertEquals("last-known-good-ciphertext", primary.readText())
+        assertFalse(backup.exists())
+    }
+
+    @Test
+    fun preservesBothFilesWhenKeystoreValidationIsUnavailable() {
+        val primary = temporaryFolder.newFile("profiles.vault").apply {
+            writeText("new-ciphertext")
+        }
+        val backup = temporaryFolder.newFile("profiles.vault.bak").apply {
+            writeText("old-ciphertext")
+        }
+
+        assertThrows(VaultKeyUnavailableException::class.java) {
+            recoverVaultReplacement(
+                primary,
+                backup,
+                isPrimaryValid = { throw VaultKeyUnavailableException("Keystore unavailable") },
+                moveFile = ::moveForTest,
+                syncDirectory = {}
+            )
+        }
+
+        assertTrue(primary.exists())
+        assertTrue(backup.exists())
+        assertEquals("new-ciphertext", primary.readText())
+        assertEquals("old-ciphertext", backup.readText())
+    }
+
+    private fun moveForTest(source: File, destination: File) {
+        Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+
 }
