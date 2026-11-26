@@ -17,48 +17,18 @@ import (
 )
 
 const (
-	libXrayV4APIVersion       = 4
-	maxV4AbsoluteBytes        = 4 * 1024 * 1024
-	maxV4ProfileBytes         = 2 * 1024 * 1024
-	maxV4ControlBytes         = 64 * 1024
-	maxV4NestingDepth         = 32
-	maxV4ObjectFields         = 64
-	maxV4ArrayElements        = 4096
-	maxV4ConvertedOutbounds   = 256
+	libXrayV4APIVersion = 4
+	maxV4AbsoluteBytes = 4 * 1024 * 1024
+	maxV4ProfileBytes = 2 * 1024 * 1024
+	maxV4ControlBytes = 64 * 1024
+	maxV4NestingDepth = 32
+	maxV4ObjectFields = 64
+	maxV4ArrayElements = 4096
+	maxV4ConvertedOutbounds = 256
 )
 
 var (
-	v4RequestIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}package libXray
-
-import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"io"
-	"reflect"
-	"regexp"
-	"strconv"
-	"strings"
-	"sync"
-	"unicode/utf8"
-
-	"github.com/xtls/libxray/share"
-	"github.com/xtls/libxray/xray"
-)
-
-const (
-	libXrayV4APIVersion       = 4
-	maxV4AbsoluteBytes        = 4 * 1024 * 1024
-	maxV4ProfileBytes         = 2 * 1024 * 1024
-	maxV4ControlBytes         = 64 * 1024
-	maxV4NestingDepth         = 32
-	maxV4ObjectFields         = 64
-	maxV4ArrayElements        = 4096
-	maxV4ConvertedOutbounds   = 256
-)
-
-var (
-	)
+	v4RequestIDPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 	errV4RequestTooLarge = errors.New("request exceeds method size limit")
 	v4InvokeMu sync.Mutex
 )
