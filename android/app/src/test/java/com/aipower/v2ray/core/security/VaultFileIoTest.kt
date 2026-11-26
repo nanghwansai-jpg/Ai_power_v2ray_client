@@ -149,6 +149,64 @@ class VaultFileIoTest {
         assertEquals("last-known-good-ciphertext", backup.readText())
     }
 
+
+    @Test
+    fun restoresBackupAfterCrashBetweenPrimaryRemovalAndBackupRestore() {
+        val primary = temporaryFolder.newFile("profiles.vault").apply { writeText("corrupt-primary") }
+        val backup = temporaryFolder.newFile("profiles.vault.bak").apply { writeText("authenticated-backup") }
+
+        // Simulate process death after recovery has removed an unauthenticated primary.
+        assertTrue(primary.delete())
+        recoverVaultReplacement(
+            primary, backup,
+            isPrimaryValid = { error("No primary should be validated") },
+            moveFile = ::moveForTest,
+            syncDirectory = {}
+        )
+        assertEquals("authenticated-backup", primary.readText())
+        assertFalse(backup.exists())
+    }
+
+    @Test
+    fun retriesRecoveryAfterDirectorySyncFailureWithoutLosingCommittedPrimary() {
+        val primary = File(temporaryFolder.root, "profiles.vault")
+        val backup = temporaryFolder.newFile("profiles.vault.bak").apply { writeText("authenticated-backup") }
+
+        assertThrows(java.io.IOException::class.java) {
+            recoverVaultReplacement(
+                primary, backup,
+                isPrimaryValid = { true },
+                moveFile = ::moveForTest,
+                syncDirectory = { throw java.io.IOException("simulated process interruption at directory sync") }
+            )
+        }
+        assertEquals("authenticated-backup", primary.readText())
+        assertFalse(backup.exists())
+
+        recoverVaultReplacement(
+            primary, backup,
+            isPrimaryValid = { it.readText() == "authenticated-backup" },
+            moveFile = ::moveForTest,
+            syncDirectory = {}
+        )
+        assertEquals("authenticated-backup", primary.readText())
+    }
+
+    @Test
+    fun corruptPrimaryCiphertextFallsBackToLastAuthenticatedBackup() {
+        val primary = temporaryFolder.newFile("profiles.vault").apply { writeBytes(ByteArray(64) { 0x55 }) }
+        val backup = temporaryFolder.newFile("profiles.vault.bak").apply { writeText("known-good-authenticated-ciphertext") }
+
+        recoverVaultReplacement(
+            primary, backup,
+            isPrimaryValid = { it.readText() == "known-good-authenticated-ciphertext" },
+            moveFile = ::moveForTest,
+            syncDirectory = {}
+        )
+        assertEquals("known-good-authenticated-ciphertext", primary.readText())
+        assertFalse(backup.exists())
+    }
+
     private fun moveForTest(source: File, destination: File) {
         Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
