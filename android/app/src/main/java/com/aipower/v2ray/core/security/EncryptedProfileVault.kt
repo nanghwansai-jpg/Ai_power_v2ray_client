@@ -72,6 +72,7 @@ class EncryptedProfileVault(context: Context) {
                 output.fd.sync()
             }
             setOwnerOnlyPermissions(temp)
+            FileOutputStream(temp, true).use { it.fd.sync() }
 
             // Keep the old authenticated ciphertext until the new temp file is ready.
             if (vaultFile.exists()) {
@@ -276,26 +277,33 @@ internal fun readVaultBounded(file: File, maxBytes: Long): ByteArray {
     }
 
     FileInputStream(file).use { input ->
-        val output = ByteArrayOutputStream(minOf(file.length(), maxBytes).toInt())
-        val buffer = ByteArray(8 * 1024)
-        var total = 0L
-        while (true) {
-            val remainingIncludingProbe = maxBytes + 1L - total
-            if (remainingIncludingProbe <= 0L) {
-                error("Encrypted profile vault exceeds the permitted size.")
-            }
-            val requested = minOf(buffer.size.toLong(), remainingIncludingProbe).toInt()
-            val count = input.read(buffer, 0, requested)
-            if (count == -1) break
-            if (count == 0) continue
-            total += count
-            require(total <= maxBytes) {
-                "Encrypted profile vault exceeds the permitted size."
-            }
-            output.write(buffer, 0, count)
-        }
-        return output.toByteArray()
+        readVaultStreamBounded(input, maxBytes)
     }
+}
+
+internal fun readVaultStreamBounded(input: java.io.InputStream, maxBytes: Long): ByteArray {
+    require(maxBytes >= 0 && maxBytes < Int.MAX_VALUE) {
+        "Maximum vault size is outside the supported range."
+    }
+    val output = ByteArrayOutputStream(minOf(maxBytes, 8L * 1024L).toInt())
+    val buffer = ByteArray(8 * 1024)
+    var total = 0L
+    while (true) {
+        val remainingIncludingProbe = maxBytes + 1L - total
+        if (remainingIncludingProbe <= 0L) {
+            error("Encrypted profile vault exceeds the permitted size.")
+        }
+        val requested = minOf(buffer.size.toLong(), remainingIncludingProbe).toInt()
+        val count = input.read(buffer, 0, requested)
+        if (count == -1) break
+        if (count == 0) continue
+        total += count
+        require(total <= maxBytes) {
+            "Encrypted profile vault exceeds the permitted size."
+        }
+        output.write(buffer, 0, count)
+    }
+    return output.toByteArray()
 }
 
 class VaultKeyUnavailableException(
