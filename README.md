@@ -19,3 +19,4 @@ Open the repository in Android Studio and sync Gradle after configuring the requ
 - [Architecture](docs/ARCHITECTURE.md)
 - [Delivery roadmap](docs/ROADMAP.md)
 - [Security policy](docs/SECURITY.md)
+- [Build and release guide](docs/BUILD_RELEASE.md)
