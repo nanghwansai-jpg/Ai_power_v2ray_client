@@ -349,7 +349,7 @@ internal fun readVaultBounded(file: File, maxBytes: Long): ByteArray {
         "Encrypted profile vault exceeds the permitted size."
     }
 
-    FileInputStream(file).use { input ->
+    return FileInputStream(file).use { input ->
         readVaultStreamBounded(input, maxBytes)
     }
 }
