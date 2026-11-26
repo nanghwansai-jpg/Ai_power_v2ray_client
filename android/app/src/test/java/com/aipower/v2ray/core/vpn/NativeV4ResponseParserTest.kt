@@ -161,11 +161,20 @@ class NativeV4ResponseParserTest {
             NativeV4FaultInjection.wrongApiVersion(valid),
             NativeV4FaultInjection.wrongMethod(valid),
             NativeV4FaultInjection.oversizedControlResponse(valid),
-            NativeV4FaultInjection.deeplyNestedResponse(valid),
             NativeV4FaultInjection.malformedUnicode(valid),
             NativeV4FaultInjection.contradictorySuccessEnvelope(valid)
         ).forEach { malformed ->
             expectFailure { NativeV4ResponseParser.parse(malformed, id, "testXray") }
+        }
+    }
+
+    @Test fun deeplyNestedFaultIsRejectedByTheNestingLimit() {
+        val nested = NativeV4FaultInjection.deeplyNestedResponse(response())
+        try {
+            NativeV4ResponseParser.parse(nested, id, "testXray")
+            fail("Expected nesting-limit rejection")
+        } catch (e: IllegalArgumentException) {
+            assertEquals("JSON nesting limit exceeded", e.message)
         }
     }
 
