@@ -37,6 +37,7 @@ class EncryptedProfileVault(context: Context) {
 
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+        cipher.updateAAD(AAD)
         val encrypted = cipher.doFinal(payload)
         val iv = cipher.iv
         require(iv.size == GCM_IV_BYTES) { "Unexpected AES-GCM nonce size." }
@@ -69,6 +70,7 @@ class EncryptedProfileVault(context: Context) {
         val ciphertext = bytes.copyOfRange(GCM_IV_BYTES, bytes.size)
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
+        cipher.updateAAD(AAD)
         val plaintext = cipher.doFinal(ciphertext)
         val payload = JSONObject(String(plaintext, Charsets.UTF_8))
         require(payload.optInt("version") == FORMAT_VERSION) { "Unsupported profile vault format." }
@@ -119,5 +121,6 @@ class EncryptedProfileVault(context: Context) {
         private const val GCM_IV_BYTES = 12
         private const val GCM_TAG_BITS = 128
         private const val GCM_TAG_BYTES = GCM_TAG_BITS / 8
+        private val AAD = "com.aipower.v2ray.profile.v1".toByteArray(Charsets.UTF_8)
     }
 }
