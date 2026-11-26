@@ -465,7 +465,7 @@ func estimateV4JSONSize(value reflect.Value, limit int) int {
 		iter := value.MapRange()
 		for iter.Next() {
 			key := iter.Key()
-			total += 1 + key.Len()*6 + 3 + estimateV4JSONSize(iter.Value(), limit)
+			total += 1 + estimateV4JSONSize(key, limit) + 1 + estimateV4JSONSize(iter.Value(), limit)
 			if total > limit { return total }
 		}
 		return total
