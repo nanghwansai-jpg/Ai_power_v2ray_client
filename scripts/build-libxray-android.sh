@@ -14,6 +14,14 @@ command -v gomobile >/dev/null || true
 rm -rf "$WORK_DIR"
 mkdir -p "$(dirname "$WORK_DIR")"
 git clone --depth 1 --branch "$LIBXRAY_VERSION" https://github.com/XTLS/libXray.git "$WORK_DIR"
+ACTUAL_COMMIT="$(git -C "$WORK_DIR" rev-parse HEAD)"
+case "$LIBXRAY_VERSION:$ACTUAL_COMMIT" in
+  v26.11.9:5a0f7d8*) ;;
+  *)
+    echo "Unexpected libXray source revision: $ACTUAL_COMMIT for $LIBXRAY_VERSION" >&2
+    exit 1
+    ;;
+esac
 
 (
   cd "$WORK_DIR"
