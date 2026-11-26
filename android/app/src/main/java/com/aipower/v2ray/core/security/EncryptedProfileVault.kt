@@ -87,6 +87,8 @@ class EncryptedProfileVault(context: Context) {
         if (vaultFile.exists() && !vaultFile.delete()) {
             error("Could not delete the encrypted profile vault.")
         }
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
     }
 
     private fun getOrCreateKey(): SecretKey {
