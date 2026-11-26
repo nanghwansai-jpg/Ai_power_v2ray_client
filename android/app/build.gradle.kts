@@ -53,7 +53,9 @@ android {
 
     buildTypes {
         getByName("release") {
-            // PR CI can build an unsigned release variant for DEX inspection.\n            // Actual release jobs provide all signing env vars and use the protected keystore.\n            signingConfig = if (releaseSigningConfigured) signingConfigs.getByName("release") else null
+            // PR CI can build an unsigned release variant for DEX inspection.
+            // Actual release jobs provide all signing env vars and use the protected keystore.
+            signingConfig = if (releaseSigningConfigured) signingConfigs.getByName("release") else null
             isMinifyEnabled = false
         }
     }
