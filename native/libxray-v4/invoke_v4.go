@@ -122,6 +122,9 @@ func InvokeV4(requestJSON string) (response string) {
 	if *method == string(LibXrayMethodConvertShareLinksToXrayJson) {
 		budget = maxV4ProfileBytes
 	}
+	if err := validateV4ResultPreflight(*method, data); err != nil {
+		return encodeV4Failure(requestID, method, "INTERNAL_ERROR", "INTERNAL", false)
+	}
 	if estimateV4JSONSize(reflect.ValueOf(data), budget+1) > budget {
 		return encodeV4Failure(requestID, method, "RESPONSE_TOO_LARGE", "LIMIT", false)
 	}
@@ -335,6 +338,39 @@ func executeV4Method(method string, payload map[string]any) (any, error) {
 	default:
 		return nil, errors.New("unsupported method")
 	}
+}
+
+func validateV4ResultPreflight(method string, data any) error {
+	if method != string(LibXrayMethodConvertShareLinksToXrayJson) {
+		return nil
+	}
+	value := reflect.ValueOf(data)
+	for value.IsValid() && (value.Kind() == reflect.Pointer || value.Kind() == reflect.Interface) {
+		if value.IsNil() { return errors.New("nil converted profile") }
+		value = value.Elem()
+	}
+	if !value.IsValid() || value.Kind() != reflect.Struct {
+		return errors.New("converted profile is not a struct")
+	}
+	typeInfo := value.Type()
+	for i := 0; i < value.NumField(); i++ {
+		field := typeInfo.Field(i)
+		jsonName := strings.Split(field.Tag.Get("json"), ",")[0]
+		if jsonName != "outbounds" { continue }
+		outbounds := value.Field(i)
+		for outbounds.IsValid() && (outbounds.Kind() == reflect.Pointer || outbounds.Kind() == reflect.Interface) {
+			if outbounds.IsNil() { return errors.New("nil outbounds") }
+			outbounds = outbounds.Elem()
+		}
+		if !outbounds.IsValid() || (outbounds.Kind() != reflect.Slice && outbounds.Kind() != reflect.Array) {
+			return errors.New("outbounds is not an array")
+		}
+		if outbounds.Len() == 0 || outbounds.Len() > maxV4ConvertedOutbounds {
+			return errors.New("outbound count limit")
+		}
+		return nil
+	}
+	return errors.New("outbounds field missing")
 }
 
 func validateV4Result(method string, dataJSON []byte) error {
