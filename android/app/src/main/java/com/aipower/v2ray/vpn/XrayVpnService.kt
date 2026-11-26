@@ -234,11 +234,14 @@ class XrayVpnService : VpnService() {
         if (removeForeground) removeForegroundNotification()
     }
 
-    private fun shutdownWorkerWithCleanup() {
+    private fun shutdownWorkerWithCleanup(stopServiceAfterCleanup: Boolean = false) {
         // Queue cleanup behind any in-flight operation. Queued user actions
         // check destroyed and are skipped; this final cleanup task still runs.
         try {
-            worker.execute { stopTunnel() }
+            worker.execute {
+                stopTunnel()
+                if (stopServiceAfterCleanup) stopSelf()
+            }
         } catch (_: RejectedExecutionException) {
             // Best-effort fallback for an already-terminated executor.
             stopTunnel()
@@ -248,7 +251,7 @@ class XrayVpnService : VpnService() {
 
     override fun onRevoke() {
         if (destroyed.compareAndSet(false, true)) {
-            shutdownWorkerWithCleanup()
+            shutdownWorkerWithCleanup(stopServiceAfterCleanup = true)
         }
         super.onRevoke()
     }
