@@ -28,15 +28,15 @@ internal class LibXrayRuntime(
         val controller = Proxy.newProxyInstance(
             controllerType.classLoader,
             arrayOf(controllerType)
-        ) { _, method, args ->
+        ) { proxy, method, args ->
             when (method.name.lowercase()) {
                 "protectfd" -> {
                     val fd = (args?.firstOrNull() as? Number)?.toInt() ?: -1
                     fd >= 0 && (vpnService?.protect(fd) ?: false)
                 }
                 "tostring" -> "AI Power VPN socket protector"
-                "hashcode" -> System.identityHashCode(this)
-                "equals" -> false
+                "hashcode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
                 else -> defaultValue(method.returnType)
             }
         }
@@ -59,12 +59,12 @@ internal class LibXrayRuntime(
         val disabledController = Proxy.newProxyInstance(
             controllerType.classLoader,
             arrayOf(controllerType)
-        ) { _, method, _ ->
+        ) { proxy, method, args ->
             when (method.name.lowercase()) {
                 "protectfd" -> false
                 "tostring" -> "Inactive AI Power VPN socket protector"
-                "hashcode" -> System.identityHashCode(this)
-                "equals" -> false
+                "hashcode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
                 else -> defaultValue(method.returnType)
             }
         }
@@ -99,6 +99,12 @@ internal class LibXrayRuntime(
     }
 
     fun invoke(method: String, payload: JSONObject = JSONObject()): JSONObject {
+        require(method in ALLOWED_METHODS) { "Unsupported libXray operation" }
+        val payloadText = payload.toString()
+        require(payloadText.length <= MAX_PAYLOAD_CHARS) {
+            "libXray request payload is too large"
+        }
+
         val binding = bindingClass()
         val invoke = binding.methods.firstOrNull {
             it.name.equals("invoke", ignoreCase = true) &&
@@ -108,14 +114,18 @@ internal class LibXrayRuntime(
         val request = JSONObject()
             .put("apiVersion", 2)
             .put("method", method)
-            .put("payload", payload)
+            .put("payload", JSONObject(payloadText))
             .toString()
 
         val raw = invoke.invoke(null, request) as? String
             ?: error("libXray returned an empty response")
+        require(raw.length <= MAX_RESPONSE_CHARS) {
+            "libXray response is too large"
+        }
         val response = JSONObject(raw)
         if (!response.optBoolean("success", false)) {
-            error(response.optString("error").ifBlank { "Xray operation failed" })
+            // Do not expose native error text that may contain profile or endpoint data.
+            error("Xray operation failed")
         }
         return response
     }
@@ -133,5 +143,16 @@ internal class LibXrayRuntime(
         java.lang.Byte.TYPE -> 0.toByte()
         java.lang.Character.TYPE -> '\u0000'
         else -> null
+    }
+
+    companion object {
+        private val ALLOWED_METHODS = setOf(
+            "convertShareLinksToXrayJson",
+            "testXray",
+            "runXray",
+            "stopXray"
+        )
+        private const val MAX_PAYLOAD_CHARS = 2_000_000
+        private const val MAX_RESPONSE_CHARS = 2_000_000
     }
 }
