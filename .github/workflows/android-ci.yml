@@ -64,8 +64,32 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Run unit tests and build debug APK
-        run: gradle :android:app:testDebugUnitTest :android:app:assembleDebug
+      - name: Run unit tests and build debug APK (retry Maven Central rate limits)
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            set +e
+            gradle --no-daemon --max-workers=2 :android:app:testDebugUnitTest :android:app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-unit-build.log"
+            status=${PIPESTATUS[0]}
+            set -e
+
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+
+            if ! grep -Eqi 'HTTP.*429|status code 429|Too Many Requests' "$RUNNER_TEMP/android-unit-build.log"; then
+              exit "$status"
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Maven Central continued returning HTTP 429 after 3 attempts."
+              exit "$status"
+            fi
+
+            delay=$((attempt * 20))
+            echo "Maven Central rate-limited this attempt; retrying in ${delay}s."
+            sleep "$delay"
+          done
 
       - name: Build release variant and inspect DEX for test-only fault injection
         run: |
