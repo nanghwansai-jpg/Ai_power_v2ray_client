@@ -57,5 +57,13 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Build debug APK
-        run: gradle :android:app:assembleDebug
+      - name: Run unit tests and build debug APK
+        run: gradle :android:app:testDebugUnitTest :android:app:assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-power-v2ray-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
