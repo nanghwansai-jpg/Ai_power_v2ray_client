@@ -51,6 +51,7 @@ class XrayVpnService : VpnService() {
     @Synchronized
     private fun startTunnel(rawConfig: String) {
         val engine = LibXrayRuntime(this)
+        runtime = engine
         check(engine.registerSocketProtector()) {
             "libXray Android socket-protection API is unavailable"
         }
@@ -93,8 +94,11 @@ class XrayVpnService : VpnService() {
         } catch (error: Exception) {
             runCatching { engine.invoke("stopXray") }
             runCatching { engine.resetDns() }
+            runCatching { engine.unregisterSocketProtector() }
             descriptor.close()
             tun = null
+            runtime = null
+            coreStarted = false
             throw error
         }
     }
@@ -155,6 +159,7 @@ class XrayVpnService : VpnService() {
             runCatching { runtime?.invoke("stopXray") }
         }
         runCatching { runtime?.resetDns() }
+        runCatching { runtime?.unregisterSocketProtector() }
         coreStarted = false
         runtime = null
         runCatching { tun?.close() }
