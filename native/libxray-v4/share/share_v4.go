@@ -14,7 +14,7 @@ import (
 
 var (
 	ErrV4ShareInputTooLarge = errors.New("profile input exceeds supported size")
-	ErrV4ShareOutputTooLarge = errors.New("profile output exceeds supported size")
+	ErrV4ShareOutputTooLarge = ErrV4ShareOutputTooLarge
 )
 
 const (
@@ -106,7 +106,10 @@ func decryptShareTextV4(links, secretKey string) (string, bool, error) {
 }
 
 func filterBuildableOutboundsV4(config *conf.Config) (*conf.Config, error) {
-	if config == nil || len(config.OutboundConfigs) == 0 || len(config.OutboundConfigs) > maxV4ShareOutbounds {
+	if config == nil || len(config.OutboundConfigs) == 0 {
+		return nil, errors.New("no valid outbound found")
+	}
+	if len(config.OutboundConfigs) > maxV4ShareOutbounds {
 		return nil, ErrV4ShareOutputTooLarge
 	}
 	if estimateShareJSONSize(reflect.ValueOf(config.OutboundConfigs), maxV4ShareOutputBytes+1) > maxV4ShareOutputBytes {
@@ -158,7 +161,7 @@ func marshalShareConfigJSONV4(config *conf.Config) (json.RawMessage, error) {
 			continue
 		}
 		if estimateShareJSONSize(reflect.ValueOf(projected), maxV4ShareOutputBytes+1) > maxV4ShareOutputBytes {
-			return nil, errors.New("profile output exceeds supported size")
+			return nil, ErrV4ShareOutputTooLarge
 		}
 		if err := validateProjectedShareOutbound(projected); err != nil {
 			continue
@@ -166,7 +169,7 @@ func marshalShareConfigJSONV4(config *conf.Config) (json.RawMessage, error) {
 		outbounds = append(outbounds, projected)
 		if len(outbounds) > maxV4ShareOutbounds ||
 			estimateShareJSONSize(reflect.ValueOf(outbounds), maxV4ShareOutputBytes+1) > maxV4ShareOutputBytes {
-			return nil, errors.New("profile output exceeds supported size")
+			return nil, ErrV4ShareOutputTooLarge
 		}
 	}
 	if len(outbounds) == 0 {
@@ -174,11 +177,11 @@ func marshalShareConfigJSONV4(config *conf.Config) (json.RawMessage, error) {
 	}
 	result := map[string]any{"outbounds": outbounds}
 	if estimateShareJSONSize(reflect.ValueOf(result), maxV4ShareOutputBytes+1) > maxV4ShareOutputBytes {
-		return nil, errors.New("profile output exceeds supported size")
+		return nil, ErrV4ShareOutputTooLarge
 	}
 	raw, err := json.Marshal(result)
 	if err != nil || len(raw) > maxV4ShareOutputBytes {
-		return nil, errors.New("profile output exceeds supported size")
+		return nil, ErrV4ShareOutputTooLarge
 	}
 	return raw, nil
 }
