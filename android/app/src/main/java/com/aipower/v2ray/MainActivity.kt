@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
                                     aiReply = "Gemini ကို မေးနေသည်…"
                                     Thread {
                                         val result = callGemini(key, question)
-                                        runOnUiThread { aiReply = result; store.log(if (result.startsWith("Gemini error")) "ERROR" else "INFO", "GEMINI", result); logs = store.logs() }
+                                        runOnUiThread { aiReply = result; store.log(if (result.startsWith("Gemini error")) "ERROR" else "INFO", "GEMINI", if (result.startsWith("Gemini error")) "Gemini request failed" else "Gemini response received"); logs = store.logs() }
                                     }.start()
                                 }
                             }, { screen = Screen.SETTINGS }, { store.log("INFO", "AGENT", "Local recovery diagnostics requested"); logs = store.logs(); aiReply = "Local Agent is active. No validated profile health probe is available yet; import a profile and run a connection test." })
@@ -456,10 +456,11 @@ private fun SettingToggle(label: String, checked: Boolean, onChange: (Boolean) -
 private fun callGemini(apiKey: String, prompt: String): String {
     var connection: HttpURLConnection? = null
     return try {
-        val endpoint = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + java.net.URLEncoder.encode(apiKey, "UTF-8"))
+        val endpoint = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent")
         connection = (endpoint.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"; connectTimeout = 12000; readTimeout = 20000; doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("x-goog-api-key", apiKey)
         }
         val body = JSONObject().put("contents", org.json.JSONArray().put(JSONObject()
             .put("parts", org.json.JSONArray().put(JSONObject().put("text", "You are a privacy-first Android VPN troubleshooting assistant. Never request credentials or recommend unauthorized network access bypass. User question: " + prompt.take(4000))))))
