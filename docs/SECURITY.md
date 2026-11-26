@@ -21,7 +21,7 @@ Please report security vulnerabilities privately to the repository maintainer. D
 - Ciphertext is stored under `noBackupFilesDir`, so Android Auto Backup does not copy it to cloud backup.
 - Vault reads are bounded to 2 MiB while streaming; a second size check after reading rejects oversized or truncated content.
 - New ciphertext is written to a unique temporary file, flushed, assigned owner-only permissions, and synced before replacement.
-- Replacement keeps a recovery backup until the new primary file is installed; the next load/save repairs an interrupted swap and removes stale temporary files.
+- Replacement keeps a recovery backup until the new primary file is installed. Recovery authenticates the primary AES-GCM ciphertext before discarding the backup; if the primary is incomplete, it restores the last known-good backup. If Keystore access or recovery I/O fails, both files are preserved for a later retry.
 - Decryption requires the existing Android Keystore key. Missing or invalidated keys are reported as a recoverable key-availability condition; the vault never silently generates a replacement key while loading.
 - **Load saved profile** decrypts locally. **Delete saved profile** removes the ciphertext and deletes the corresponding Keystore key.
 - There is no cloud upload, telemetry, or subscription URL storage in this vault.
