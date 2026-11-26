@@ -49,10 +49,6 @@ class XrayVpnService : VpnService() {
 
         val config = JSONObject(rawConfig)
         engine.invoke("testXray", JSONObject().put("xrayJson", config.toString()))
-        check(engine.configureDns("1.1.1.1:53")) {
-            "libXray Android DNS protection API is unavailable"
-        }
-
         val env = config.optJSONObject("env") ?: JSONObject().also {
             config.put("env", it)
         }
@@ -74,9 +70,11 @@ class XrayVpnService : VpnService() {
             .establish() ?: error("Android could not establish the VPN interface")
 
         tun = descriptor
-        tunEnv.put("fd", descriptor.fd)
-
         try {
+            check(engine.configureDns("1.1.1.1:53")) {
+                "libXray Android DNS protection API is unavailable"
+            }
+            tunEnv.put("fd", descriptor.fd)
             engine.invoke(
                 "runXray",
                 JSONObject().put("xrayJson", config.toString())
