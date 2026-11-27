@@ -17,11 +17,7 @@ class XrayProfileParser {
         require(text.isNotBlank()) { "Paste a V2Ray/Xray share link or Xray JSON first." }
         require(text.length <= MAX_INPUT_CHARS) { "Profile input is too large." }
 
-        val response = LibXrayRuntime().invoke(
-            "convertShareLinksToXrayJson",
-            JSONObject().put("text", text.trim())
-        )
-        val normalized = response.optString("data")
+        val normalized = LibXrayRuntime().convertShareLinksToXrayJsonV4(text.trim())
         require(normalized.isNotBlank()) { "The profile parser returned no Xray configuration." }
 
         val config = JSONObject(normalized)

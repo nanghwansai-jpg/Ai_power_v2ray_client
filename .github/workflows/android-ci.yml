@@ -2,13 +2,17 @@ name: Android CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, security/android-v3-hardening]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: android-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   debug-build:
@@ -26,7 +30,6 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # The action's default package list includes the removed legacy `tools` package.
           packages: platform-tools
 
       - name: Install Android SDK platform and build tools
@@ -42,7 +45,7 @@ jobs:
       - name: Set up Go from pinned libXray module
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.x"
+          go-version: "1.27.3"
           cache: false
 
       - name: Set up Python
@@ -61,8 +64,83 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Run unit tests and build debug APK
-        run: gradle :android:app:testDebugUnitTest :android:app:assembleDebug
+      - name: Run unit tests and build debug APK (retry Maven Central rate limits)
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            set +e
+            gradle --no-daemon --max-workers=2 :android:app:testDebugUnitTest :android:app:assembleDebug 2>&1 | tee "$RUNNER_TEMP/android-unit-build.log"
+            status=${PIPESTATUS[0]}
+            set -e
+
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+
+            if ! grep -Eqi 'HTTP.*429|status code 429|Too Many Requests' "$RUNNER_TEMP/android-unit-build.log"; then
+              exit "$status"
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Maven Central continued returning HTTP 429 after 3 attempts."
+              exit "$status"
+            fi
+
+            delay=$((attempt * 20))
+            echo "Maven Central rate-limited this attempt; retrying in ${delay}s."
+            sleep "$delay"
+          done
+
+      - name: Build release variant and inspect DEX for test-only fault injection
+        run: |
+          set -euo pipefail
+
+          STORE_PASSWORD="ci-inspection-password"
+          KEY_ALIAS="ci-inspection"
+          KEYSTORE="$RUNNER_TEMP/ci-release-inspection.keystore"
+          CSR="$RUNNER_TEMP/ci-release-inspection.csr"
+
+          keytool -genkeypair -noprompt \
+            -storetype PKCS12 \
+            -keystore "$KEYSTORE" \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -dname "CN=CI Release Inspection" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 2
+
+          keytool -list -v \
+            -storetype PKCS12 \
+            -keystore "$KEYSTORE" \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
+          keytool -certreq \
+            -storetype PKCS12 \
+            -keystore "$KEYSTORE" \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -file "$CSR" >/dev/null
+          test -s "$CSR"
+          rm -f "$CSR"
+
+          export ANDROID_KEYSTORE_FILE="$KEYSTORE"
+          export ANDROID_KEYSTORE_PASSWORD="$STORE_PASSWORD"
+          export ANDROID_KEY_ALIAS="$KEY_ALIAS"
+          export ANDROID_KEY_PASSWORD="$STORE_PASSWORD"
+
+          gradle :android:app:assembleRelease
+
+          APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
+          test -n "$APK"
+          if unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' | while read -r dex; do unzip -p "$APK" "$dex"; done | strings | grep -F 'AI_POWER_V4_FAULT_INJECTION_TEST_ONLY' >/dev/null; then
+            echo "::error::Test-only native V4 fault injection marker found in release APK"
+            exit 1
+          fi
+          echo "Verified: test-only fault injection code is absent from release APK DEX."
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -71,3 +149,11 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload native V4 build provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: libxray-v4-build-provenance
+          path: ${{ runner.temp }}/libXray/native-v4-build.txt
+          if-no-files-found: error
+          retention-days: 90

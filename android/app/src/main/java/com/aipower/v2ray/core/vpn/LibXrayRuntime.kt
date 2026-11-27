@@ -3,6 +3,7 @@ package com.aipower.v2ray.core.vpn
 import android.net.VpnService
 import java.lang.reflect.Proxy
 import org.json.JSONObject
+import java.util.UUID
 
 /**
  * Narrow boundary around the official XTLS/libXray gomobile AAR.
@@ -28,15 +29,15 @@ internal class LibXrayRuntime(
         val controller = Proxy.newProxyInstance(
             controllerType.classLoader,
             arrayOf(controllerType)
-        ) { _, method, args ->
+        ) { proxy, method, args ->
             when (method.name.lowercase()) {
                 "protectfd" -> {
                     val fd = (args?.firstOrNull() as? Number)?.toInt() ?: -1
                     fd >= 0 && (vpnService?.protect(fd) ?: false)
                 }
                 "tostring" -> "AI Power VPN socket protector"
-                "hashcode" -> System.identityHashCode(this)
-                "equals" -> false
+                "hashcode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
                 else -> defaultValue(method.returnType)
             }
         }
@@ -59,12 +60,12 @@ internal class LibXrayRuntime(
         val disabledController = Proxy.newProxyInstance(
             controllerType.classLoader,
             arrayOf(controllerType)
-        ) { _, method, _ ->
+        ) { proxy, method, args ->
             when (method.name.lowercase()) {
                 "protectfd" -> false
                 "tostring" -> "Inactive AI Power VPN socket protector"
-                "hashcode" -> System.identityHashCode(this)
-                "equals" -> false
+                "hashcode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
                 else -> defaultValue(method.returnType)
             }
         }
@@ -99,6 +100,12 @@ internal class LibXrayRuntime(
     }
 
     fun invoke(method: String, payload: JSONObject = JSONObject()): JSONObject {
+        require(method in ALLOWED_METHODS) { "Unsupported libXray operation" }
+        val payloadText = payload.toString()
+        require(payloadText.length <= MAX_PAYLOAD_CHARS) {
+            "libXray request payload is too large"
+        }
+
         val binding = bindingClass()
         val invoke = binding.methods.firstOrNull {
             it.name.equals("invoke", ignoreCase = true) &&
@@ -106,18 +113,89 @@ internal class LibXrayRuntime(
         } ?: error("libXray Invoke(String) entry point was not found")
 
         val request = JSONObject()
-            .put("apiVersion", 2)
+            .put("apiVersion", LIBXRAY_API_VERSION)
             .put("method", method)
-            .put("payload", payload)
+            .put("payload", JSONObject(payloadText))
             .toString()
 
         val raw = invoke.invoke(null, request) as? String
             ?: error("libXray returned an empty response")
+        require(raw.length <= MAX_RESPONSE_CHARS) {
+            "libXray response is too large"
+        }
         val response = JSONObject(raw)
         if (!response.optBoolean("success", false)) {
-            error(response.optString("error").ifBlank { "Xray operation failed" })
+            // Do not expose native error text that may contain profile or endpoint data.
+            error("Xray operation failed")
         }
         return response
+    }
+
+    /**
+     * App-owned V4 entry point. This is intentionally additive: invoke() above
+     * remains the unchanged V3 compatibility path until service migration gates pass.
+     */
+    /** Private V4 transport: request envelope -> native binding -> strict typed response. */
+    private fun invokeV4(method: String, payload: JSONObject = JSONObject()): NativeV4Result {
+        require(method in V4_ALLOWED_METHODS) { "Unsupported libXray V4 operation" }
+        val payloadText = payload.toString()
+        val payloadBytes = payloadText.toByteArray(Charsets.UTF_8).size
+        val maxPayload = if (method == "convertShareLinksToXrayJson") {
+            MAX_V4_PROFILE_BYTES
+        } else {
+            MAX_V4_CONTROL_BYTES
+        }
+        require(payloadBytes <= maxPayload) { "libXray V4 request payload is too large" }
+
+        val requestId = UUID.randomUUID().toString()
+        val request = JSONObject()
+            .put("apiVersion", V4_API_VERSION)
+            .put("requestId", requestId)
+            .put("method", method)
+            .put("payload", JSONObject(payloadText))
+            .toString()
+        require(request.toByteArray(Charsets.UTF_8).size <= MAX_V4_ABSOLUTE_BYTES) {
+            "libXray V4 request is too large"
+        }
+
+        val binding = bindingClass()
+        val invokeV4 = binding.methods.firstOrNull {
+            it.name.equals("invokeV4", ignoreCase = true) &&
+                it.parameterTypes.contentEquals(arrayOf(String::class.java))
+        } ?: error("libXray V4 binding is unavailable")
+
+        val raw = try {
+            invokeV4.invoke(null, request) as? String
+                ?: error("libXray V4 returned an empty response")
+        } catch (_: ReflectiveOperationException) {
+            throw IllegalStateException("libXray V4 invocation failed")
+        }
+        return NativeV4ResponseParser.parse(raw, requestId, method)
+    }
+
+    fun convertShareLinksToXrayJsonV4(text: String, ageSecretKey: String? = null): String {
+        val payload = JSONObject().put("text", text)
+        if (ageSecretKey != null) payload.put("age", JSONObject().put("secretKey", ageSecretKey))
+        return (invokeV4("convertShareLinksToXrayJson", payload) as? NativeV4Result.ConvertedProfile
+            ?: error("Unexpected libXray V4 conversion result")).configJson
+    }
+
+    fun testXrayV4(xrayJson: String) {
+        check(invokeV4("testXray", JSONObject().put("xrayJson", xrayJson)) === NativeV4Result.ConfigValid) {
+            "Unexpected libXray V4 test result"
+        }
+    }
+
+    fun runXrayV4(xrayJson: String) {
+        check(invokeV4("runXray", JSONObject().put("xrayJson", xrayJson)) === NativeV4Result.Started) {
+            "Unexpected libXray V4 start result"
+        }
+    }
+
+    fun stopXrayV4() {
+        check(invokeV4("stopXray") === NativeV4Result.Stopped) {
+            "Unexpected libXray V4 stop result"
+        }
     }
 
     private fun bindingClass(): Class<*> =
@@ -133,5 +211,28 @@ internal class LibXrayRuntime(
         java.lang.Byte.TYPE -> 0.toByte()
         java.lang.Character.TYPE -> '\u0000'
         else -> null
+    }
+
+    companion object {
+        // Must match LibXrayAPIVersion in the pinned XTLS/libXray v26.11.9 source.
+        private const val LIBXRAY_API_VERSION = 3
+        private val ALLOWED_METHODS = setOf(
+            "convertShareLinksToXrayJson",
+            "testXray",
+            "runXray",
+            "stopXray"
+        )
+        private const val MAX_PAYLOAD_CHARS = 2_000_000
+        private const val MAX_RESPONSE_CHARS = 2_000_000
+        private const val V4_API_VERSION = 4
+        private const val MAX_V4_CONTROL_BYTES = 64 * 1024
+        private const val MAX_V4_PROFILE_BYTES = 2 * 1024 * 1024
+        private const val MAX_V4_ABSOLUTE_BYTES = 4 * 1024 * 1024
+        private val V4_ALLOWED_METHODS = setOf(
+            "convertShareLinksToXrayJson",
+            "testXray",
+            "runXray",
+            "stopXray"
+        )
     }
 }
