@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aipower.v2ray.core.agent.AgentLocalStore
@@ -287,6 +288,7 @@ private fun ServersScreen(
     onSelect: (ImportedXrayProfile) -> Unit,
     limit: String
 ) {
+    val context = LocalContext.current
     var subscriptionUrl by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<List<ServerCandidate>>(emptyList()) }
@@ -317,7 +319,8 @@ private fun ServersScreen(
                 Thread {
                     val outcome = runCatching {
                         run {
-                            val connectivity = getSystemService(ConnectivityManager::class.java)
+                            val connectivity = context.getSystemService(ConnectivityManager::class.java)
+                                ?: error("Connectivity service is unavailable.")
                             val physicalNetwork = connectivity.allNetworks.firstOrNull { network ->
                                 val caps = connectivity.getNetworkCapabilities(network)
                                 caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
